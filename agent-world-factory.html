@@ -1,0 +1,93 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>🏭 Agent World Factory</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:monospace;background:#0a0a0a;color:#0f0;padding:20px}.panel{background:#001100;border:1px solid #0f0;padding:20px;margin:10px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px;margin:20px 0}.card{background:#002200;border:1px solid #0f0;padding:15px;cursor:pointer;transition:all .3s}.card:hover{background:#003300;box-shadow:0 0 20px #0f0}.btn{background:#0f0;color:#000;border:none;padding:10px 20px;cursor:pointer;font-family:monospace;font-weight:bold;margin:5px}.btn:hover{background:#0ff}h1,h2{color:#0ff;margin:10px 0}pre{background:#000;padding:10px;border-left:3px solid #0f0;overflow-x:auto}code{color:#ff0}.section{margin:20px 0;padding:15px;border-left:3px solid #0f0}</style></head><body><h1>🏭 AGENT WORLD FACTORY - Meta-Generator System</h1><div class="panel"><h2>📋 Plan Overview</h2><p>System for generating infinite variations of agent-based file system visualizations</p></div><div class="section"><h2>🧬 Core Agent DNA Components</h2><div class="grid"><div class="card"><h3>⚙️ State Machine</h3><pre>states = [
+  'idle',
+  'seeking',
+  'moving',
+  'working',
+  'returning',
+  'depositing'
+]</pre></div><div class="card"><h3>🎯 Behaviors</h3><pre>behaviors = [
+  'pathfind',
+  'build',
+  'mine',
+  'collect',
+  'patrol',
+  'swarm'
+]</pre></div><div class="card"><h3>📊 Attributes</h3><pre>attributes = {
+  pos: {x,y,z},
+  vel: {x,y,z},
+  inventory: [],
+  target: null,
+  energy: 100,
+  team: 0
+}</pre></div><div class="card"><h3>🧠 AI Types</h3><pre>aiTypes = [
+  'random',
+  'nearestTarget',
+  'swarmFollow',
+  'hierarchical',
+  'emergent',
+  'evolutionary'
+]</pre></div></div></div><div class="section"><h2>🌍 World Archetypes (Mix & Match)</h2><div class="grid"><div class="card"onclick="generate('ocean')"><h3>🌊 Ocean/Coral</h3><p>Polyp agents build coral reefs<br>Resources: nutrients<br>Structures: branches, plates</p></div><div class="card"onclick="generate('space')"><h3>🚀 Space Station</h3><p>Engineer agents build modules<br>Resources: materials, energy<br>Structures: corridors, labs</p></div><div class="card"onclick="generate('crystal')"><h3>💎 Crystal Cave</h3><p>Growth agents crystallize<br>Resources: minerals<br>Structures: geodes, clusters</p></div><div class="card"onclick="generate('garden')"><h3>🌸 Garden</h3><p>Gardener agents tend plants<br>Resources: seeds, water<br>Structures: flowers, trees</p></div><div class="card"onclick="generate('factory')"><h3>🏭 Factory</h3><p>Robot agents assemble<br>Resources: parts, power<br>Structures: products, lines</p></div><div class="card"onclick="generate('colony')"><h3>🐜 Ant Colony</h3><p>Worker ants tunnel & gather<br>Resources: food<br>Structures: chambers, tunnels</p></div><div class="card"onclick="generate('archeology')"><h3>🏺 Dig Site</h3><p>Excavators uncover artifacts<br>Resources: soil layers<br>Structures: ruins, relics</p></div><div class="card"onclick="generate('abstract')"><h3>🔮 Abstract Dimension</h3><p>Geometric agents create fractals<br>Resources: equations<br>Structures: impossible geometry</p></div></div></div><div class="section"><h2>🔧 Generator Configuration</h2><pre><code>const AgentWorldTemplate = {
+  // World Settings
+  world: {
+    type: 'ocean|space|crystal|garden|factory|colony|dig|abstract',
+    size: [width, height, depth],
+    gravity: boolean,
+    fog: {color, near, far}
+  },
+
+  // Agent Configuration
+  agents: [
+    {
+      type: 'builder|miner|collector|patrol|hybrid',
+      count: number,
+      ai: 'random|nearest|swarm|hierarchical|emergent',
+      speed: number,
+      size: number,
+      color: hex,
+      behaviors: ['pathfind', 'build', 'mine'],
+      states: ['idle', 'moving', 'working', 'returning']
+    }
+  ],
+
+  // Resource Spawning
+  resources: [
+    {
+      type: 'code|config|data|asset',
+      spawnRate: number,
+      distribution: 'random|grid|cluster|perlin',
+      value: number,
+      color: hex
+    }
+  ],
+
+  // Structure Rules
+  structures: {
+    buildFrom: 'resources|files|generated',
+    style: 'voxel|mesh|procedural|organic',
+    growth: 'instant|gradual|emergent',
+    decay: boolean,
+    maxHeight: number
+  },
+
+  // Emergent Behaviors
+  emergence: {
+    enableSwarm: boolean,
+    enableEvolution: boolean,
+    enableEcosystem: boolean,
+    enableMarket: boolean
+  },
+
+  // Visual Style
+  aesthetic: {
+    lighting: 'day|night|neon|minimal',
+    particles: boolean,
+    trails: boolean,
+    glow: boolean
+  }
+}</code></pre></div><div class="section"><h2>⚡ Quick Generation Patterns</h2><button class="btn"onclick="quickGen('minimal')">Minimal (1 agent type, simple)</button><button class="btn"onclick="quickGen('standard')">Standard (2 agent types, moderate)</button><button class="btn"onclick="quickGen('complex')">Complex (3+ types, emergent)</button><button class="btn"onclick="quickGen('chaos')">Chaos (random everything)</button></div><div class="section"><h2>🎨 Style Presets</h2><div class="grid"><div class="card"onclick="style('neon')"><h3>🌃 Neon Cyberpunk</h3><p>Dark bg, glowing edges, neon colors</p></div><div class="card"onclick="style('organic')"><h3>🌿 Organic Natural</h3><p>Earth tones, soft lighting, curves</p></div><div class="card"onclick="style('minimal')"><h3>⬜ Minimal Geometric</h3><p>White/black, clean lines, simple</p></div><div class="card"onclick="style('retro')"><h3>🕹️ Retro Pixel</h3><p>Low-poly, chunky voxels, bright</p></div></div></div><div class="section"><h2>📦 Output Format</h2><pre><code>// Generates single-file HTML with:
+// - Compressed Three.js code
+// - Agent AI systems
+// - World generation
+// - UI controls
+// - Auto-repo scanning
+// Target size: 3-5KB per world</code></pre><button class="btn"onclick="generateWorld()">🚀 GENERATE NEW WORLD</button><button class="btn"onclick="generateBatch()">📦 GENERATE BATCH (10 variations)</button></div><div id="output"style="margin-top:20px;padding:20px;background:#000;border:1px solid #0f0;display:none"><h2>📄 Generated World Code</h2><pre id="code"></pre><button class="btn"onclick="download()">💾 Download HTML</button><button class="btn"onclick="preview()">👁️ Preview</button></div><script>const worldTypes={ocean:{bg:0x001a33,fg:0x00ffff,agent:'polyp',resource:'nutrient',structure:'coral'},space:{bg:0x000000,fg:0xffffff,agent:'engineer',resource:'material',structure:'module'},crystal:{bg:0x1a001a,fg:0xff00ff,agent:'grower',resource:'mineral',structure:'crystal'},garden:{bg:0x1a331a,fg:0x00ff00,agent:'gardener',resource:'seed',structure:'plant'},factory:{bg:0x2a2a2a,fg:0xff8800,agent:'robot',resource:'part',structure:'product'},colony:{bg:0x331a00,fg:0xffaa00,agent:'worker',resource:'food',structure:'chamber'},archeology:{bg:0x332200,fg:0xaa8844,agent:'excavator',resource:'artifact',structure:'ruin'},abstract:{bg:0x0a0a0a,fg:0x00ffff,agent:'geometric',resource:'equation',structure:'fractal'}};function generate(t){alert(`Generating ${t} world with autonomous agents...`);console.log('World config:',worldTypes[t])}function quickGen(t){alert(`Quick generating ${t} complexity world...`)}function style(s){alert(`Applying ${s} visual style...`)}function generateWorld(){document.getElementById('output').style.display='block';document.getElementById('code').textContent='// Generated agent world code would appear here...\n// Full HTML with Three.js, agents, and world generation'}function generateBatch(){alert('Generating 10 world variations...')}function download(){alert('Downloading generated HTML...')}function preview(){alert('Opening preview window...')}</script></body></html>
