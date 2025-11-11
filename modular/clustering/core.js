@@ -1,5 +1,8 @@
-import { KMeans, DBSCAN, spawnPoints } from './clustering.js';
+import { spawnPoints } from './points.js';
+import { KMeans } from './kmeans.js';
+import { DBSCAN } from './dbscan.js';
 import { initScene, updateViz, render } from './viz.js';
+import { updateStats, setupEventListeners } from './ui.js';
 
 class ClusteringApp {
   constructor() {
@@ -10,12 +13,16 @@ class ClusteringApp {
     this.iter = 0;
     this.eps = 15;
     this.minPts = 3;
+    this.scene = null;
+    this.camera = null;
+    this.renderer = null;
   }
 
   async init() {
     initScene(this);
     this.pts = spawnPoints(100, this.scene);
     this.kmeans();
+    setupEventListeners(this);
     this.loop();
   }
 
@@ -32,6 +39,7 @@ class ClusteringApp {
   addPoints() {
     const newPts = spawnPoints(20, this.scene);
     this.pts.push(...newPts);
+    this.updateStats();
   }
 
   reset() {
@@ -41,22 +49,21 @@ class ClusteringApp {
     this.centroids = [];
     this.iter = 0;
     this.pts = spawnPoints(100, this.scene);
+    this.kmeans();
   }
 
   updateStats() {
-    document.getElementById('pts').textContent = this.pts.length;
-    const uniqueClusters = new Set(this.pts.map(p => p.cluster).filter(c => c !== -1));
-    document.getElementById('cls').textContent = this.method === 'kmeans' ? this.k : uniqueClusters.size;
-    document.getElementById('iter').textContent = this.iter;
-    document.getElementById('mth').textContent = this.method.toUpperCase();
+    updateStats(this);
   }
 
   loop() {
     requestAnimationFrame(() => this.loop());
     updateViz(this);
+
     if (this.method === 'kmeans' && Math.random() < 0.1) {
       KMeans(this, true);
     }
+
     render(this);
   }
 }
