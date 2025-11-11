@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>📚 DDI - Document Driven Interface</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Courier New', monospace;
+  background: #0a0a0a;
+  color: #0ff;
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 300px;
+  background: #111;
+  border-right: 2px solid #0ff;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  background: #111;
+  border-bottom: 2px solid #0ff;
+  padding: 20px;
+}
+
+h1 { color: #0ff; text-shadow: 0 0 10px #0ff; margin-bottom: 10px; }
+.subtitle { color: #0f0; font-size: 12px; }
+
+.content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.docs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background: #0a0a0a;
+}
+
+.preview {
+  width: 50%;
+  background: #000;
+  border-left: 2px solid #0ff;
+  position: relative;
+}
+
+#canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.console {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  background: rgba(0, 0, 0, 0.9);
+  border-top: 1px solid #0ff;
+  overflow-y: auto;
+  padding: 10px;
+  font-size: 11px;
+}
+
+.file-item {
+  padding: 10px;
+  margin: 5px 0;
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid #0ff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.file-item:hover {
+  background: rgba(0, 255, 255, 0.2);
+  transform: translateX(5px);
+}
+
+.file-item.active {
+  background: rgba(0, 255, 0, 0.2);
+  border-color: #0f0;
+}
+
+.ddi-doc h2 {
+  color: #0f0;
+  margin: 20px 0 10px;
+  border-bottom: 1px solid #0f0;
+  padding-bottom: 5px;
+}
+
+.code-block {
+  background: #111;
+  border: 1px solid #0ff;
+  border-radius: 4px;
+  margin: 15px 0;
+  overflow: hidden;
+}
+
+.code-header {
+  background: rgba(0, 255, 255, 0.2);
+  padding: 5px 10px;
+  font-size: 10px;
+  color: #0ff;
+  border-bottom: 1px solid #0ff;
+}
+
+.code-block pre {
+  padding: 10px;
+  margin: 0;
+  overflow-x: auto;
+  font-size: 11px;
+  color: #0f0;
+}
+
+.code-block button {
+  width: 100%;
+  background: rgba(0, 255, 0, 0.2);
+  border: none;
+  border-top: 1px solid #0f0;
+  color: #0f0;
+  padding: 8px;
+  cursor: pointer;
+  font-family: monospace;
+  transition: all 0.2s;
+}
+
+.code-block button:hover {
+  background: rgba(0, 255, 0, 0.4);
+}
+
+.log { margin: 2px 0; }
+.log.info { color: #0ff; }
+.log.success { color: #0f0; }
+.log.error { color: #f00; }
+
+.controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 5px;
+  z-index: 10;
+}
+
+.btn {
+  background: rgba(0, 255, 255, 0.2);
+  border: 1px solid #0ff;
+  color: #0ff;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-family: monospace;
+  font-size: 11px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.btn:hover {
+  background: rgba(0, 255, 255, 0.4);
+}
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <h2 style="color:#0ff;margin-bottom:15px;">📚 DDI Files</h2>
+  <div id="file-list"></div>
+</div>
+
+<div class="main">
+  <div class="header">
+    <h1>📚 Document Driven Interface</h1>
+    <p class="subtitle">Executable documentation • Run markdown files as programs</p>
+  </div>
+
+  <div class="content">
+    <div class="docs" id="docs">
+      <p style="color:#888;">Select a DDI file from the sidebar to begin...</p>
+    </div>
+
+    <div class="preview">
+      <canvas id="canvas"></canvas>
+      <div class="controls">
+        <button class="btn" onclick="app.runAll()">▶️ Run All</button>
+        <button class="btn" onclick="app.clear()">🔄 Clear</button>
+      </div>
+      <div class="console" id="console"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { DDIRunner } from './runner.js';
+
+class DDIApp {
+  constructor() {
+    this.runner = new DDIRunner();
+    this.currentDoc = null;
+    this.files = [
+      { name: 'Clustering', path: 'examples/clustering.md', icon: '🎨' }
+    ];
+    this.init();
+  }
+
+  init() {
+    this.renderFileList();
+    window.ddi = this;
+  }
+
+  renderFileList() {
+    const list = document.getElementById('file-list');
+    list.innerHTML = this.files.map((f, i) => `
+      <div class="file-item" onclick="app.loadFile(${i})">
+        <div style="font-size:24px;margin-bottom:5px;">${f.icon}</div>
+        <div style="font-size:12px;">${f.name}</div>
+      </div>
+    `).join('');
+  }
+
+  async loadFile(index) {
+    const file = this.files[index];
+    this.log(`Loading ${file.name}...`, 'info');
+
+    try {
+      const doc = await this.runner.load(file.path);
+      this.currentDoc = doc;
+
+      // Highlight active file
+      document.querySelectorAll('.file-item').forEach((el, i) => {
+        el.classList.toggle('active', i === index);
+      });
+
+      // Render documentation
+      const container = document.getElementById('docs');
+      this.runner.render(doc, container);
+
+      this.log(`Loaded ${doc.title}`, 'success');
+    } catch (error) {
+      this.log(`Error: ${error.message}`, 'error');
+    }
+  }
+
+  async runBlock(index) {
+    if (!this.currentDoc) return;
+
+    const block = this.currentDoc.code[index];
+    this.log(`Executing block ${index + 1} (${block.type})...`, 'info');
+
+    try {
+      const canvas = document.getElementById('canvas');
+      const context = {
+        THREE,
+        canvas,
+        document,
+        window,
+        console: {
+          log: (...args) => this.log(args.join(' '), 'info')
+        }
+      };
+
+      const func = new Function(...Object.keys(context), block.code);
+      const result = await func(...Object.values(context));
+
+      if (result !== undefined) {
+        this.log(`Result: ${JSON.stringify(result)}`, 'success');
+      } else {
+        this.log(`Executed successfully`, 'success');
+      }
+    } catch (error) {
+      this.log(`Error: ${error.message}`, 'error');
+    }
+  }
+
+  async runAll() {
+    if (!this.currentDoc) return;
+
+    this.log('Running all blocks...', 'info');
+
+    for (let i = 0; i < this.currentDoc.code.length; i++) {
+      const block = this.currentDoc.code[i];
+      if (block.executable) {
+        await this.runBlock(i);
+      }
+    }
+
+    this.log('All blocks executed', 'success');
+  }
+
+  clear() {
+    const consoleEl = document.getElementById('console');
+    consoleEl.innerHTML = '';
+    this.log('Console cleared', 'info');
+  }
+
+  log(message, type = 'info') {
+    const consoleEl = document.getElementById('console');
+    const time = new Date().toLocaleTimeString();
+    const log = document.createElement('div');
+    log.className = `log ${type}`;
+    log.textContent = `[${time}] ${message}`;
+    consoleEl.appendChild(log);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+}
+
+const app = new DDIApp();
+window.app = app;
+</script>
+</body>
+</html>
