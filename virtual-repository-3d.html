@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏭 Virtual Repository - ISA-95 3D File System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0f0;
+            overflow: hidden;
+        }
+
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .hud-panel {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #0ff;
+            padding: 10px;
+            margin: 10px;
+            pointer-events: all;
+            backdrop-filter: blur(5px);
+        }
+
+        #top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        #info-panel {
+            max-width: 300px;
+        }
+
+        #stats-panel {
+            max-width: 250px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            font-size: 11px;
+        }
+
+        .stat-label { color: #888; }
+        .stat-value { color: #0ff; font-weight: bold; }
+
+        #level-indicator {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: all;
+        }
+
+        .level-btn {
+            display: block;
+            background: rgba(0, 100, 100, 0.3);
+            border: 1px solid #0ff;
+            color: #0ff;
+            padding: 8px 15px;
+            margin: 5px 0;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+        }
+
+        .level-btn:hover {
+            background: rgba(0, 255, 255, 0.3);
+            box-shadow: 0 0 10px #0ff;
+        }
+
+        .level-btn.active {
+            background: rgba(0, 255, 255, 0.5);
+            border-color: #0f0;
+            color: #0f0;
+            box-shadow: 0 0 15px #0f0;
+        }
+
+        #bottom-panel {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        #file-tree {
+            flex: 1;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 10px;
+        }
+
+        .tree-node {
+            padding: 2px 5px;
+            cursor: pointer;
+            border-left: 2px solid transparent;
+        }
+
+        .tree-node:hover {
+            background: rgba(0, 255, 255, 0.2);
+            border-left-color: #0ff;
+        }
+
+        .tree-node.selected {
+            background: rgba(0, 255, 0, 0.2);
+            border-left-color: #0f0;
+        }
+
+        #emoji-compiler {
+            width: 200px;
+            font-size: 20px;
+            line-height: 1.2;
+        }
+
+        #process-log {
+            flex: 1;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 10px;
+        }
+
+        .log-entry {
+            padding: 2px 5px;
+            border-left: 2px solid transparent;
+            animation: logFadeIn 0.3s;
+        }
+
+        @keyframes logFadeIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .log-amr { border-left-color: #ff0; color: #ff0; }
+        .log-drone { border-left-color: #f0f; color: #f0f; }
+        .log-conveyor { border-left-color: #0ff; color: #0ff; }
+        .log-system { border-left-color: #0f0; color: #0f0; }
+
+        #controls {
+            position: absolute;
+            bottom: 220px;
+            left: 10px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .control-btn {
+            background: rgba(0, 100, 0, 0.5);
+            border: 1px solid #0f0;
+            color: #0f0;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .control-btn:hover {
+            background: rgba(0, 255, 0, 0.3);
+            box-shadow: 0 0 10px #0f0;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        #tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid #0ff;
+            padding: 10px;
+            pointer-events: none;
+            display: none;
+            z-index: 1000;
+            font-size: 11px;
+            max-width: 300px;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: #0ff;
+            text-shadow: 0 0 20px #0ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <div id="hud">
+        <div id="top-bar">
+            <div class="hud-panel" id="info-panel">
+                <div style="color: #0ff; font-weight: bold; margin-bottom: 5px; font-size: 14px;">
+                    🏭 VIRTUAL REPOSITORY
+                </div>
+                <div style="font-size: 10px; color: #888;">ISA-95 File System Visualization</div>
+                <div style="margin-top: 10px; font-size: 10px;">
+                    <div id="current-level">Level: <span style="color: #0ff;">Enterprise</span></div>
+                    <div id="current-zone">Zone: <span style="color: #ff0;">Overview</span></div>
+                    <div id="selected-file">File: <span style="color: #0f0;">None</span></div>
+                </div>
+            </div>
+
+            <div class="hud-panel" id="stats-panel">
+                <div style="color: #0ff; font-weight: bold; margin-bottom: 5px; font-size: 12px;">
+                    📊 SYSTEM STATS
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">AMRs Active:</span>
+                    <span class="stat-value" id="stat-amrs">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Drones Flying:</span>
+                    <span class="stat-value" id="stat-drones">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Conveyors:</span>
+                    <span class="stat-value" id="stat-conveyors">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Files:</span>
+                    <span class="stat-value" id="stat-files">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Processing:</span>
+                    <span class="stat-value" id="stat-processing">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Compression:</span>
+                    <span class="stat-value" id="stat-compression">1:1</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="level-indicator" class="hud-panel">
+            <div style="color: #0ff; font-size: 10px; margin-bottom: 5px; text-align: center;">ISA-95 LEVELS</div>
+            <button class="level-btn active" data-level="4">🏢 L4: ENTERPRISE</button>
+            <button class="level-btn" data-level="3">🏭 L3: SITE</button>
+            <button class="level-btn" data-level="2">🏗️ L2: AREA</button>
+            <button class="level-btn" data-level="1">⚙️ L1: ZONE</button>
+            <button class="level-btn" data-level="0">🔧 L0: PROCESS</button>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button class="control-btn" onclick="Repository.spawnAMR()">🤖 Spawn AMR</button>
+        <button class="control-btn" onclick="Repository.spawnDrone()">🚁 Spawn Drone</button>
+        <button class="control-btn" onclick="Repository.addFile()">📄 Add File</button>
+        <button class="control-btn" onclick="Repository.compressAll()">🗜️ Compress</button>
+        <button class="control-btn" onclick="Repository.resetView()">🔄 Reset View</button>
+    </div>
+
+    <div id="bottom-panel">
+        <div class="hud-panel" id="file-tree">
+            <div style="color: #0ff; font-weight: bold; margin-bottom: 5px; font-size: 11px;">📁 FILE TREE</div>
+            <div id="tree-content"></div>
+        </div>
+
+        <div class="hud-panel" id="emoji-compiler">
+            <div style="color: #ff0; font-weight: bold; margin-bottom: 5px; font-size: 11px;">🔮 SnT CUBE</div>
+            <div id="emoji-cube"></div>
+        </div>
+
+        <div class="hud-panel" id="process-log">
+            <div style="color: #0ff; font-weight: bold; margin-bottom: 5px; font-size: 11px;">📝 PROCESS LOG</div>
+            <div id="log-content"></div>
+        </div>
+    </div>
+
+    <div id="tooltip"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // SnT Emoji Compiler Operations
+        const EMOJI_OPS = {
+            // File Operations
+            '📄': 'READ', '📝': 'WRITE', '📋': 'COPY', '✂️': 'CUT',
+            '📁': 'FOLDER', '🗂️': 'ARCHIVE', '🗜️': 'COMPRESS', '📦': 'PACKAGE',
+
+            // Transport Operations
+            '🤖': 'AMR', '🚁': 'DRONE', '🏭': 'CONVEYOR', '🚚': 'TRUCK',
+            '⚡': 'FAST', '🐌': 'SLOW', '🔄': 'LOOP', '➡️': 'MOVE',
+
+            // Process Operations
+            '⚙️': 'PROCESS', '🔧': 'REPAIR', '🔨': 'BUILD', '🧪': 'TEST',
+            '✅': 'SUCCESS', '❌': 'ERROR', '⚠️': 'WARNING', '⏸️': 'PAUSE',
+
+            // Zone Operations
+            '🏢': 'ENTERPRISE', '🏭': 'SITE', '🏗️': 'AREA', '📍': 'ZONE',
+            '🎯': 'TARGET', '🌐': 'NETWORK', '🔗': 'LINK', '🔐': 'SECURE'
+        };
+
+        // Virtual Repository System
+        const Repository = {
+            scene: null,
+            camera: null,
+            renderer: null,
+
+            // ISA-95 Structure
+            levels: {
+                enterprise: { y: 400, size: 500, color: 0x663399 },
+                site: { y: 300, size: 400, color: 0x0066cc },
+                area: { y: 200, size: 300, color: 0x00cc66 },
+                zone: { y: 100, size: 200, color: 0xcccc00 },
+                process: { y: 0, size: 100, color: 0xcc6600 }
+            },
+
+            currentLevel: 4,
+
+            // Entities
+            amrs: [],
+            drones: [],
+            conveyors: [],
+            files: [],
+
+            // File System Structure
+            fileSystem: {
+                name: 'Enterprise',
+                type: 'enterprise',
+                children: [
+                    {
+                        name: 'Site-A',
+                        type: 'site',
+                        children: [
+                            {
+                                name: 'Production-Area',
+                                type: 'area',
+                                children: [
+                                    {
+                                        name: 'Zone-1',
+                                        type: 'zone',
+                                        files: ['config.json', 'process.ts', 'data.db']
+                                    },
+                                    {
+                                        name: 'Zone-2',
+                                        type: 'zone',
+                                        files: ['workflow.yaml', 'state.json']
+                                    }
+                                ]
+                            },
+                            {
+                                name: 'Quality-Area',
+                                type: 'area',
+                                children: [
+                                    {
+                                        name: 'Inspection-Zone',
+                                        type: 'zone',
+                                        files: ['test.spec.ts', 'metrics.json']
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        name: 'Site-B',
+                        type: 'site',
+                        children: [
+                            {
+                                name: 'Assembly-Area',
+                                type: 'area',
+                                children: [
+                                    {
+                                        name: 'Station-1',
+                                        type: 'zone',
+                                        files: ['assembly.ts', 'parts.json']
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            },
+
+            init() {
+                // Setup Three.js scene
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x000510);
+                this.scene.fog = new THREE.Fog(0x000510, 500, 2000);
+
+                // Camera
+                this.camera = new THREE.PerspectiveCamera(
+                    60,
+                    window.innerWidth / window.innerHeight,
+                    1,
+                    3000
+                );
+                this.camera.position.set(0, 500, 800);
+                this.camera.lookAt(0, 200, 0);
+
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                document.getElementById('container').appendChild(this.renderer.domElement);
+
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+                this.scene.add(ambientLight);
+
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(100, 500, 200);
+                this.scene.add(directionalLight);
+
+                // Point lights for atmosphere
+                this.addPointLight(0x00ffff, [-200, 300, 0]);
+                this.addPointLight(0xff00ff, [200, 300, 0]);
+                this.addPointLight(0x00ff00, [0, 100, -200]);
+
+                // Build ISA-95 structure
+                this.buildStructure();
+
+                // Setup controls
+                this.setupControls();
+
+                // Initialize UI
+                this.updateFileTree();
+                this.updateEmojiCube();
+
+                // Start animation loop
+                this.animate();
+
+                // Auto-spawn some entities
+                setTimeout(() => this.spawnAMR(), 1000);
+                setTimeout(() => this.spawnDrone(), 2000);
+                setTimeout(() => this.spawnConveyor(), 3000);
+
+                this.log('system', 'Virtual Repository initialized');
+            },
+
+            addPointLight(color, position) {
+                const light = new THREE.PointLight(color, 0.5, 500);
+                light.position.set(...position);
+                this.scene.add(light);
+            },
+
+            buildStructure() {
+                // Grid floor
+                const gridHelper = new THREE.GridHelper(1000, 50, 0x00ffff, 0x003333);
+                gridHelper.position.y = -10;
+                this.scene.add(gridHelper);
+
+                // Build ISA-95 levels
+                this.buildLevel('enterprise', 0, 0, 0);
+                this.buildLevel('site', -150, 0, 0);
+                this.buildLevel('site', 150, 0, 0);
+                this.buildLevel('area', -150, 0, -100);
+                this.buildLevel('area', -150, 0, 100);
+                this.buildLevel('area', 150, 0, 0);
+                this.buildLevel('zone', -200, 0, -100);
+                this.buildLevel('zone', -200, 0, 100);
+                this.buildLevel('zone', -100, 0, -100);
+                this.buildLevel('zone', 100, 0, 0);
+
+                // Add connection lines
+                this.addConnections();
+            },
+
+            buildLevel(levelName, x, y, z) {
+                const levelData = this.levels[levelName];
+                const size = levelData.size / 10;
+                const height = 80;
+
+                // Platform
+                const platformGeom = new THREE.BoxGeometry(size, 5, size);
+                const platformMat = new THREE.MeshPhongMaterial({
+                    color: levelData.color,
+                    transparent: true,
+                    opacity: 0.3,
+                    emissive: levelData.color,
+                    emissiveIntensity: 0.2
+                });
+                const platform = new THREE.Mesh(platformGeom, platformMat);
+                platform.position.set(x, levelData.y + y, z);
+                this.scene.add(platform);
+
+                // Wireframe
+                const wireframeGeom = new THREE.BoxGeometry(size, height, size);
+                const wireframeMat = new THREE.MeshBasicMaterial({
+                    color: levelData.color,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.5
+                });
+                const wireframe = new THREE.Mesh(wireframeGeom, wireframeMat);
+                wireframe.position.set(x, levelData.y + y + height / 2, z);
+                this.scene.add(wireframe);
+
+                // Label
+                this.addLabel(levelName.toUpperCase(), x, levelData.y + y + height + 10, z, levelData.color);
+
+                // Add file representations
+                this.addFiles(x, levelData.y + y + 10, z, size / 2);
+            },
+
+            addLabel(text, x, y, z, color) {
+                // Use sprite for labels
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+                ctx.font = 'bold 32px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText(text, 128, 40);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+                const sprite = new THREE.Sprite(spriteMat);
+                sprite.position.set(x, y, z);
+                sprite.scale.set(50, 12.5, 1);
+                this.scene.add(sprite);
+            },
+
+            addFiles(x, y, z, range) {
+                const fileCount = Math.floor(Math.random() * 5) + 2;
+                for (let i = 0; i < fileCount; i++) {
+                    const fx = x + (Math.random() - 0.5) * range;
+                    const fz = z + (Math.random() - 0.5) * range;
+                    this.createFile(fx, y, fz);
+                }
+            },
+
+            createFile(x, y, z) {
+                const geometry = new THREE.BoxGeometry(8, 12, 2);
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x00ff00,
+                    emissive: 0x00ff00,
+                    emissiveIntensity: 0.3
+                });
+                const file = new THREE.Mesh(geometry, material);
+                file.position.set(x, y, z);
+                file.userData = {
+                    type: 'file',
+                    name: `file_${this.files.length}.ts`,
+                    size: Math.floor(Math.random() * 10000) + 100
+                };
+                this.scene.add(file);
+                this.files.push(file);
+            },
+
+            addConnections() {
+                // Draw connection lines between levels
+                const lineMaterial = new THREE.LineBasicMaterial({
+                    color: 0x00ffff,
+                    transparent: true,
+                    opacity: 0.2
+                });
+
+                // Example connections
+                const connections = [
+                    [[0, 400, 0], [-150, 300, 0]],
+                    [[0, 400, 0], [150, 300, 0]],
+                    [[-150, 300, 0], [-150, 200, -100]],
+                    [[-150, 300, 0], [-150, 200, 100]]
+                ];
+
+                connections.forEach(([start, end]) => {
+                    const points = [new THREE.Vector3(...start), new THREE.Vector3(...end)];
+                    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                    const line = new THREE.Line(geometry, lineMaterial);
+                    this.scene.add(line);
+                });
+            },
+
+            spawnAMR() {
+                // AMR (Autonomous Mobile Robot)
+                const geometry = new THREE.BoxGeometry(15, 8, 12);
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0xffff00,
+                    emissive: 0xffff00,
+                    emissiveIntensity: 0.5
+                });
+                const amr = new THREE.Mesh(geometry, material);
+
+                // Start position
+                const startX = (Math.random() - 0.5) * 400;
+                const startZ = (Math.random() - 0.5) * 400;
+                amr.position.set(startX, 10, startZ);
+
+                // Target file
+                const targetFile = this.files[Math.floor(Math.random() * this.files.length)];
+
+                amr.userData = {
+                    type: 'amr',
+                    speed: 0.5 + Math.random() * 0.5,
+                    target: targetFile,
+                    task: ['📄', '🤖', '➡️', '📍'][Math.floor(Math.random() * 4)]
+                };
+
+                this.scene.add(amr);
+                this.amrs.push(amr);
+
+                this.log('amr', `AMR-${this.amrs.length} spawned, targeting ${targetFile.userData.name}`);
+            },
+
+            spawnDrone() {
+                // Drone
+                const geometry = new THREE.ConeGeometry(8, 15, 4);
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0xff00ff,
+                    emissive: 0xff00ff,
+                    emissiveIntensity: 0.5
+                });
+                const drone = new THREE.Mesh(geometry, material);
+
+                const startX = (Math.random() - 0.5) * 400;
+                const startZ = (Math.random() - 0.5) * 400;
+                drone.position.set(startX, 200 + Math.random() * 200, startZ);
+
+                drone.userData = {
+                    type: 'drone',
+                    speed: 1 + Math.random(),
+                    altitude: 200 + Math.random() * 200,
+                    task: '🚁'
+                };
+
+                this.scene.add(drone);
+                this.drones.push(drone);
+
+                this.log('drone', `Drone-${this.drones.length} deployed at altitude ${drone.userData.altitude.toFixed(0)}m`);
+            },
+
+            spawnConveyor() {
+                // Conveyor belt representation
+                const segments = 20;
+                const conveyor = {
+                    segments: [],
+                    speed: 0.3,
+                    userData: { type: 'conveyor', task: '🏭' }
+                };
+
+                const startX = (Math.random() - 0.5) * 300;
+                const startZ = (Math.random() - 0.5) * 300;
+
+                for (let i = 0; i < segments; i++) {
+                    const geometry = new THREE.BoxGeometry(10, 2, 10);
+                    const material = new THREE.MeshPhongMaterial({
+                        color: 0x00ffff,
+                        emissive: 0x00ffff,
+                        emissiveIntensity: 0.3
+                    });
+                    const segment = new THREE.Mesh(geometry, material);
+                    segment.position.set(startX + i * 12, 5, startZ);
+                    this.scene.add(segment);
+                    conveyor.segments.push(segment);
+                }
+
+                this.conveyors.push(conveyor);
+                this.log('conveyor', `Conveyor-${this.conveyors.length} constructed (${segments} segments)`);
+            },
+
+            addFile() {
+                const x = (Math.random() - 0.5) * 400;
+                const z = (Math.random() - 0.5) * 400;
+                const y = [0, 100, 200, 300, 400][Math.floor(Math.random() * 5)];
+                this.createFile(x, y + 10, z);
+                this.log('system', `File created: ${this.files[this.files.length - 1].userData.name}`);
+                this.updateFileTree();
+            },
+
+            compressAll() {
+                const operations = [];
+                this.files.forEach((file, i) => {
+                    const emoji = ['📄', '🗜️', '📦', '✅'];
+                    operations.push(emoji);
+                });
+
+                const compressed = operations.flat().join('');
+                const ratio = (this.files.length * 100 / compressed.length).toFixed(1);
+
+                document.getElementById('stat-compression').textContent = ratio + ':1';
+                this.log('system', `Compressed ${this.files.length} files with ${ratio}:1 ratio using SnT`);
+                this.updateEmojiCube();
+            },
+
+            updateAMRs() {
+                this.amrs.forEach((amr, index) => {
+                    if (!amr.userData.target) return;
+
+                    const target = amr.userData.target.position;
+                    const dx = target.x - amr.position.x;
+                    const dz = target.z - amr.position.z;
+                    const distance = Math.sqrt(dx * dx + dz * dz);
+
+                    if (distance > 5) {
+                        const speed = amr.userData.speed;
+                        amr.position.x += (dx / distance) * speed;
+                        amr.position.z += (dz / distance) * speed;
+                        amr.rotation.y = Math.atan2(dx, dz);
+                    } else {
+                        // Reached target, pick new one
+                        amr.userData.target = this.files[Math.floor(Math.random() * this.files.length)];
+                        this.log('amr', `AMR-${index + 1} reached destination, new target: ${amr.userData.target.userData.name}`);
+                    }
+
+                    // Bobbing animation
+                    amr.position.y = 10 + Math.sin(Date.now() * 0.003) * 2;
+                });
+            },
+
+            updateDrones() {
+                this.drones.forEach((drone, index) => {
+                    // Circular patrol pattern
+                    const time = Date.now() * 0.0005;
+                    const radius = 200;
+                    drone.position.x = Math.cos(time + index) * radius;
+                    drone.position.z = Math.sin(time + index) * radius;
+                    drone.position.y = drone.userData.altitude + Math.sin(time * 3) * 10;
+                    drone.rotation.y = time;
+                });
+            },
+
+            updateConveyors() {
+                this.conveyors.forEach(conveyor => {
+                    conveyor.segments.forEach((segment, i) => {
+                        // Moving texture effect
+                        segment.position.y = 5 + Math.sin(Date.now() * 0.003 + i * 0.3) * 1;
+                    });
+                });
+            },
+
+            updateStats() {
+                document.getElementById('stat-amrs').textContent = this.amrs.length;
+                document.getElementById('stat-drones').textContent = this.drones.length;
+                document.getElementById('stat-conveyors').textContent = this.conveyors.length;
+                document.getElementById('stat-files').textContent = this.files.length;
+                document.getElementById('stat-processing').textContent =
+                    this.amrs.filter(a => a.userData.target).length;
+            },
+
+            updateFileTree() {
+                const tree = document.getElementById('tree-content');
+                tree.innerHTML = '';
+
+                const buildTree = (node, level = 0) => {
+                    const indent = '  '.repeat(level);
+                    const icon = node.type === 'enterprise' ? '🏢' :
+                                 node.type === 'site' ? '🏭' :
+                                 node.type === 'area' ? '🏗️' :
+                                 node.type === 'zone' ? '⚙️' : '📄';
+
+                    const div = document.createElement('div');
+                    div.className = 'tree-node';
+                    div.textContent = indent + icon + ' ' + node.name;
+                    div.onclick = () => {
+                        document.querySelectorAll('.tree-node').forEach(n => n.classList.remove('selected'));
+                        div.classList.add('selected');
+                        document.querySelector('#selected-file span').textContent = node.name;
+                    };
+                    tree.appendChild(div);
+
+                    if (node.children) {
+                        node.children.forEach(child => buildTree(child, level + 1));
+                    }
+
+                    if (node.files) {
+                        node.files.forEach(file => {
+                            const fileDiv = document.createElement('div');
+                            fileDiv.className = 'tree-node';
+                            fileDiv.textContent = indent + '  📄 ' + file;
+                            fileDiv.onclick = () => {
+                                document.querySelectorAll('.tree-node').forEach(n => n.classList.remove('selected'));
+                                fileDiv.classList.add('selected');
+                                document.querySelector('#selected-file span').textContent = file;
+                            };
+                            tree.appendChild(fileDiv);
+                        });
+                    }
+                };
+
+                buildTree(this.fileSystem);
+            },
+
+            updateEmojiCube() {
+                const cube = document.getElementById('emoji-cube');
+                const emojis = ['📄', '📝', '📋', '✂️', '📁', '🗂️', '🗜️', '📦',
+                               '🤖', '🚁', '🏭', '⚡', '⚙️', '✅', '🔧', '🎯'];
+
+                // Random 4x4 emoji grid
+                let html = '';
+                for (let i = 0; i < 16; i++) {
+                    html += emojis[Math.floor(Math.random() * emojis.length)] + (i % 4 === 3 ? '<br>' : '');
+                }
+                cube.innerHTML = html;
+            },
+
+            log(type, message) {
+                const log = document.getElementById('log-content');
+                const entry = document.createElement('div');
+                entry.className = `log-entry log-${type}`;
+                const timestamp = new Date().toLocaleTimeString();
+                entry.textContent = `[${timestamp}] ${message}`;
+                log.appendChild(entry);
+
+                // Keep last 20 entries
+                while (log.children.length > 20) {
+                    log.removeChild(log.firstChild);
+                }
+
+                log.scrollTop = log.scrollHeight;
+            },
+
+            setupControls() {
+                // Level buttons
+                document.querySelectorAll('.level-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.level-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+
+                        const level = parseInt(btn.dataset.level);
+                        this.currentLevel = level;
+
+                        const levelName = ['Process', 'Zone', 'Area', 'Site', 'Enterprise'][level];
+                        document.querySelector('#current-level span').textContent = levelName;
+
+                        // Adjust camera
+                        const heights = [50, 150, 250, 400, 600];
+                        const distances = [300, 400, 500, 700, 900];
+                        this.camera.position.y = heights[level];
+                        this.camera.position.z = distances[level];
+                        this.camera.lookAt(0, heights[level] - 100, 0);
+
+                        this.log('system', `Switched to Level ${level}: ${levelName}`);
+                    });
+                });
+
+                // Mouse controls
+                let isDragging = false;
+                let previousMousePosition = { x: 0, y: 0 };
+
+                this.renderer.domElement.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                });
+
+                this.renderer.domElement.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const deltaX = e.offsetX - previousMousePosition.x;
+                        const deltaY = e.offsetY - previousMousePosition.y;
+
+                        this.camera.position.x -= deltaX * 0.5;
+                        this.camera.position.y += deltaY * 0.5;
+                    }
+
+                    previousMousePosition = { x: e.offsetX, y: e.offsetY };
+                });
+
+                this.renderer.domElement.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+
+                // Wheel zoom
+                this.renderer.domElement.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomSpeed = 50;
+                    this.camera.position.z += e.deltaY > 0 ? zoomSpeed : -zoomSpeed;
+                    this.camera.position.z = Math.max(200, Math.min(1500, this.camera.position.z));
+                });
+
+                // Window resize
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            },
+
+            resetView() {
+                this.camera.position.set(0, 500, 800);
+                this.camera.lookAt(0, 200, 0);
+                this.log('system', 'View reset to default');
+            },
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                // Update entities
+                this.updateAMRs();
+                this.updateDrones();
+                this.updateConveyors();
+
+                // Rotate files slowly
+                this.files.forEach(file => {
+                    file.rotation.y += 0.01;
+                });
+
+                // Update stats periodically
+                if (Math.random() < 0.01) {
+                    this.updateStats();
+                }
+
+                // Random emoji cube updates
+                if (Math.random() < 0.02) {
+                    this.updateEmojiCube();
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        };
+
+        // Initialize on load
+        window.addEventListener('load', () => {
+            Repository.init();
+        });
+    </script>
+</body>
+</html>
