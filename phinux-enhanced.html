@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PHINUX v1.618 | Φ-Based Genetic Linux [ENHANCED]</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            overflow: hidden;
+        }
+        #terminal {
+            width: 100vw;
+            height: 100vh;
+            padding: 20px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .boot { color: #0ff; text-shadow: 0 0 5px #0ff; }
+        .prompt { color: #0f0; }
+        .error { color: #f00; text-shadow: 0 0 3px #f00; }
+        .warning { color: #fa0; }
+        .info { color: #0af; }
+        .success { color: #0f0; text-shadow: 0 0 3px #0f0; }
+        .phi { color: #ff0; text-shadow: 0 0 5px #ff0; }
+        .proc { color: #f0f; }
+        .gene { color: #0ff; text-shadow: 0 0 3px #0ff; }
+        .dim { opacity: 0.6; }
+        .bright { font-weight: bold; }
+        .input-line {
+            display: flex;
+            margin-top: 5px;
+        }
+        #input {
+            background: transparent;
+            border: none;
+            color: #0f0;
+            font: inherit;
+            flex: 1;
+            outline: none;
+            caret-color: #0f0;
+        }
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 16px;
+            background: #0f0;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .pulse { animation: pulse 2s infinite; }
+        #history { user-select: text; }
+        .progress-bar {
+            display: inline-block;
+            width: 200px;
+            height: 10px;
+            border: 1px solid #0f0;
+            position: relative;
+            vertical-align: middle;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0f0, #ff0);
+            transition: width 0.3s;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            margin-left: 5px;
+        }
+        .badge-elite { background: #ff0; color: #000; }
+        .badge-weak { background: #f00; color: #fff; }
+        .badge-avg { background: #0af; color: #fff; }
+        #status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 20, 0, 0.9);
+            border-top: 1px solid #0f0;
+            padding: 5px 10px;
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .status-item { margin: 0 10px; }
+    </style>
+</head>
+<body>
+    <div id="terminal">
+        <div id="history"></div>
+        <div class="input-line">
+            <span class="prompt" id="ps1">guest@phinux:~$ </span>
+            <input type="text" id="input" autofocus autocomplete="off" spellcheck="false">
+        </div>
+    </div>
+
+    <div id="status-bar">
+        <div class="status-item">
+            <span class="phi">φ</span> <span id="phi-value">1.618</span>
+        </div>
+        <div class="status-item">
+            Processes: <span id="proc-count">4</span>
+        </div>
+        <div class="status-item">
+            Avg Fitness: <span id="avg-fitness">8.5</span>
+        </div>
+        <div class="status-item">
+            Entropy: <span id="entropy-value">0.618</span>
+        </div>
+        <div class="status-item">
+            Gen: <span id="generation">1</span>
+        </div>
+        <div class="status-item">
+            Uptime: <span id="uptime">0s</span>
+        </div>
+    </div>
+
+    <script>
+        const PHI = (1 + Math.sqrt(5)) / 2;
+        const IPHI = 1 / PHI;
+
+        const PHINUX = {
+            user: 'guest',
+            hostname: 'phinux',
+            cwd: '/home/guest',
+            history: [],
+            historyIndex: -1,
+            generation: Date.now(),
+            evolutionCycles: 0,
+            mutationCount: 0,
+            crossoverCount: 0,
+            autoEvolve: false,
+            aliases: {},
+
+            // Genetic process system
+            processes: [
+                { pid: 1, name: 'init', user: 'root', cpu: 0.1, mem: 0.5, age: 0, fitness: 10, genes: [0xDE, 0xAD, 0xBE, 0xEF] },
+                { pid: 2, name: 'phi-daemon', user: 'root', cpu: 0.3, mem: 1.2, age: 0, fitness: 8, genes: [0xCA, 0xFE, 0xBA, 0xBE] },
+                { pid: 3, name: 'entropy-balancer', user: 'root', cpu: 0.2, mem: 0.8, age: 0, fitness: 9, genes: [0xFE, 0xED, 0xFA, 0xCE] },
+                { pid: 4, name: 'genetic-scheduler', user: 'root', cpu: 0.4, mem: 1.5, age: 0, fitness: 7, genes: [0xBA, 0xAD, 0xF0, 0x0D] }
+            ],
+            nextPid: 5,
+
+            // Enhanced filesystem with editing
+            fs: {
+                '/': { type: 'dir', contents: ['bin', 'home', 'etc', 'var', 'proc', 'phi', 'dev'], created: Date.now() },
+                '/bin': { type: 'dir', contents: ['ls', 'cat', 'echo', 'ps', 'kill', 'evolve', 'mutate', 'breed'], created: Date.now() },
+                '/home': { type: 'dir', contents: ['guest'], created: Date.now() },
+                '/home/guest': { type: 'dir', contents: ['README.phi', 'dna.dat', '.bash_history', 'notes.txt'], created: Date.now() },
+                '/home/guest/README.phi': { type: 'file', content: `🧬 Welcome to PHINUX v1.618 [ENHANCED]
+
+A φ-based genetic Linux operating system with advanced evolution.
+
+NEW FEATURES:
+  • Auto-evolution (type 'auto on')
+  • Visual fitness bars
+  • Enhanced mutations
+  • Genetic visualization
+  • Tab completion
+  • File creation/editing
+  • Process genealogy
+  • Fitness graphs
+
+COMMANDS:
+  help - Show all commands
+  dna - Show system DNA
+  evolve - Evolve processes
+  phitop - Process monitor
+  genealogy - Show family tree
+  auto [on|off] - Toggle auto-evolution
+  graph - Fitness distribution
+  fortune - Phi wisdom
+
+The system self-organizes around φ ≈ 1.618
+Entropy is balanced at φ⁻¹ ≈ 0.618
+
+Type "help" to begin.`, created: Date.now() },
+                '/home/guest/dna.dat': { type: 'file', content: 'SYSTEM_DNA_v1.618\n=========\nGene[0]: 0xDEADBEEF (process_spawn)\nGene[1]: 0xCAFEBABE (entropy_balance)\nGene[2]: 0xFEEDFACE (mutation_rate)\nGene[3]: 0xBAADF00D (fitness_function)\n\nGeneration: ' + Date.now().toString(36) + '\nMutations: 0\nCrossovers: 0', created: Date.now() },
+                '/home/guest/notes.txt': { type: 'file', content: 'My PHINUX Notes\n================\n\n- The golden ratio is everywhere\n- Evolution never stops\n- Entropy seeks balance\n', created: Date.now() },
+                '/home/guest/.bash_history': { type: 'file', content: '', created: Date.now() },
+                '/etc': { type: 'dir', contents: ['phi.conf', 'hosts', 'passwd'], created: Date.now() },
+                '/etc/phi.conf': { type: 'file', content: 'PHI=1.618033988749\nIPHI=0.618033988749\nENTROPY_TARGET=0.618\nMUTATION_RATE=0.1\nCROSSOVER_RATE=0.3\nELITISM=2\nAUTO_EVOLVE_INTERVAL=10000', created: Date.now() },
+                '/var': { type: 'dir', contents: ['log'], created: Date.now() },
+                '/var/log': { type: 'dir', contents: ['phinux.log', 'evolution.log'], created: Date.now() },
+                '/var/log/phinux.log': { type: 'file', content: '[BOOT] PHINUX v1.618 initialized\n[INFO] Genetic scheduler started\n[INFO] Entropy balancer active\n', created: Date.now() },
+                '/var/log/evolution.log': { type: 'file', content: '', created: Date.now() },
+                '/proc': { type: 'dir', contents: ['cpuinfo', 'meminfo', 'entropy', 'generation'], created: Date.now() },
+                '/proc/cpuinfo': { type: 'file', content: 'processor: 0\nmodel name: Φ-Core v1.618\nφ-units: 8\nentropy: balanced\nfrequency: ' + (1.618 * 1000).toFixed(0) + ' MHz', created: Date.now() },
+                '/proc/meminfo': { type: 'file', content: 'MemTotal: 16180 MB\nMemFree: ' + Math.floor(16180 * IPHI) + ' MB\nMemAvailable: ' + Math.floor(16180 * IPHI * 0.9) + ' MB', created: Date.now() },
+                '/proc/entropy': { type: 'file', content: 'Current: 0.618\nTarget: 0.618\nPhase: EQUILIBRIUM\nOscillations: 42', created: Date.now() },
+                '/proc/generation': { type: 'file', content: 'Current Generation: 1\nEvolution Cycles: 0\nTotal Mutations: 0\nTotal Crossovers: 0', created: Date.now() },
+                '/phi': { type: 'dir', contents: ['golden.txt', 'spiral.dat', 'fibonacci.seq'], created: Date.now() },
+                '/phi/golden.txt': { type: 'file', content: 'φ = (1 + √5) / 2 ≈ 1.618033988749\n\nThe golden ratio appears in:\n- Nature (spirals, trees, DNA)\n- Mathematics (Fibonacci, fractals)\n- Art and architecture\n- This operating system!\n\nφ² = φ + 1\nφ⁻¹ = φ - 1 ≈ 0.618', created: Date.now() },
+                '/phi/spiral.dat': { type: 'file', content: '🌀 Fibonacci Spiral Data\n1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597...', created: Date.now() },
+                '/phi/fibonacci.seq': { type: 'file', content: 'F(0) = 0\nF(1) = 1\nF(n) = F(n-1) + F(n-2)\n\nSequence:\n0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 6765...\n\nRatio converges to φ: 1.618033988749', created: Date.now() },
+                '/dev': { type: 'dir', contents: ['null', 'zero', 'random', 'phi'], created: Date.now() },
+                '/dev/null': { type: 'special', content: '', created: Date.now() },
+                '/dev/zero': { type: 'special', content: '', created: Date.now() },
+                '/dev/random': { type: 'special', content: '', created: Date.now() },
+                '/dev/phi': { type: 'special', content: '', created: Date.now() }
+            },
+
+            // Commands (same structure, I'll add enhancements)
+            commands: {
+                help() {
+                    return `<span class="info">╔════════════════════════════════════════════════════════════╗
+║         PHINUX v1.618 [ENHANCED] - Command Reference        ║
+╚════════════════════════════════════════════════════════════╝</span>
+
+<span class="phi">SYSTEM:</span>
+  help              Show this help
+  clear             Clear terminal
+  uname [-a]        System information
+  hostname          Show hostname
+  whoami            Current user
+  uptime            System uptime
+  date              Current date/time
+  history           Command history
+  alias             Manage aliases
+
+<span class="phi">FILESYSTEM:</span>
+  ls [-l] [path]    List directory (use -l for details)
+  pwd               Print working directory
+  cd [path]         Change directory
+  cat <file>        Display file content
+  echo <text>       Print text (use > file to write)
+  touch <file>      Create empty file
+  mkdir <dir>       Create directory
+  rm <file>         Remove file
+  tree [path]       Show directory tree
+  find <name>       Find files
+
+<span class="phi">PROCESSES:</span>
+  ps [-l]           List processes (use -l for details)
+  phitop            Interactive process monitor
+  kill <pid>        Kill process
+  spawn <name>      Spawn new process
+  nice <pid> <fit>  Set process fitness
+
+<span class="phi">GENETIC EVOLUTION:</span>
+  dna [pid]         Show system/process DNA
+  evolve [n]        Evolve processes (n times)
+  mutate [rate]     Mutate population
+  breed <p1> <p2>   Breed two processes
+  cull [thresh]     Kill weak processes
+  genealogy [pid]   Show process family tree
+  auto [on|off]     Toggle auto-evolution
+
+<span class="phi">ANALYSIS & VISUALIZATION:</span>
+  entropy           Show entropy status
+  graph [type]      Show fitness graph (bar|hist|tree)
+  stats             Population statistics
+  compare <p1> <p2> Compare two processes
+
+<span class="phi">PHI UTILITIES:</span>
+  phi               Calculate golden ratio
+  fibonacci [n]     Fibonacci sequence
+  fortune           Phi wisdom
+  spiral [n]        Draw Fibonacci spiral
+
+<span class="phi">NETWORK:</span>
+  ping <host>       Ping (simulated)
+  ifconfig          Network config
+
+<span class="bright">TIP:</span> Press TAB for command completion
+<span class="bright">TIP:</span> Use UP/DOWN arrows for command history
+
+Type <span class="success">man &lt;command&gt;</span> for detailed help.`;
+                },
+
+                clear() {
+                    document.getElementById('history').innerHTML = '';
+                    return '';
+                },
+
+                uname(args) {
+                    if (args[0] === '-a') {
+                        return 'PHINUX 1.618-genetic-enhanced #' + PHINUX.generation.toString().slice(-6) + ' Phi x86_64 GNU/Phi';
+                    }
+                    return 'PHINUX';
+                },
+
+                hostname() { return PHINUX.hostname; },
+                whoami() { return PHINUX.user; },
+
+                uptime() {
+                    const seconds = Math.floor((Date.now() - PHINUX.generation) / 1000);
+                    const mins = Math.floor(seconds / 60);
+                    const hours = Math.floor(mins / 60);
+                    return `up ${hours}h ${mins % 60}m, 1 user, load: 0.${Math.floor(Math.random()*99)}, 0.${Math.floor(Math.random()*99)}, 0.${Math.floor(Math.random()*99)} | Gen: ${PHINUX.evolutionCycles}`;
+                },
+
+                date() { return new Date().toString(); },
+                pwd() { return PHINUX.cwd; },
+
+                ls(args) {
+                    const showDetails = args[0] === '-l';
+                    const path = showDetails ? (args[1] ? PHINUX.resolvePath(args[1]) : PHINUX.cwd) :
+                                              (args[0] ? PHINUX.resolvePath(args[0]) : PHINUX.cwd);
+                    const entry = PHINUX.fs[path];
+
+                    if (!entry) return `<span class="error">ls: cannot access '${args[0]}': No such file or directory</span>`;
+                    if (entry.type === 'file') return args[0] || path.split('/').pop();
+
+                    if (showDetails) {
+                        let output = '<span class="info">total ' + entry.contents.length + '</span>\n';
+                        entry.contents.forEach(name => {
+                            const fullPath = path === '/' ? '/' + name : path + '/' + name;
+                            const item = PHINUX.fs[fullPath];
+                            if (item) {
+                                const type = item.type === 'dir' ? 'd' : '-';
+                                const perms = '755';
+                                const size = item.content ? item.content.length : 4096;
+                                const date = new Date(item.created).toLocaleDateString();
+                                const displayName = item.type === 'dir' ? `<span class="info">${name}/</span>` : name;
+                                output += `${type}rwxr-xr-x 1 ${PHINUX.user} ${PHINUX.user} ${size.toString().padStart(6)} ${date} ${displayName}\n`;
+                            }
+                        });
+                        return output.trim();
+                    }
+
+                    return entry.contents.map(name => {
+                        const fullPath = path === '/' ? '/' + name : path + '/' + name;
+                        const item = PHINUX.fs[fullPath];
+                        return item && item.type === 'dir' ? `<span class="info">${name}/</span>` : name;
+                    }).join('  ');
+                },
+
+                cd(args) {
+                    if (!args[0] || args[0] === '~') {
+                        PHINUX.cwd = '/home/' + PHINUX.user;
+                        return '';
+                    }
+
+                    const newPath = PHINUX.resolvePath(args[0]);
+                    const entry = PHINUX.fs[newPath];
+
+                    if (!entry) return `<span class="error">cd: ${args[0]}: No such file or directory</span>`;
+                    if (entry.type !== 'dir') return `<span class="error">cd: ${args[0]}: Not a directory</span>`;
+
+                    PHINUX.cwd = newPath;
+                    return '';
+                },
+
+                cat(args) {
+                    if (!args[0]) return `<span class="error">cat: missing file operand</span>`;
+
+                    const path = PHINUX.resolvePath(args[0]);
+                    const entry = PHINUX.fs[path];
+
+                    if (!entry) return `<span class="error">cat: ${args[0]}: No such file or directory</span>`;
+                    if (entry.type === 'dir') return `<span class="error">cat: ${args[0]}: Is a directory</span>`;
+
+                    // Special devices
+                    if (entry.type === 'special') {
+                        if (args[0].includes('random')) return Math.random().toString(36).substring(2);
+                        if (args[0].includes('phi')) return PHI.toString();
+                        if (args[0].includes('zero')) return '0'.repeat(100);
+                        return '';
+                    }
+
+                    return entry.content;
+                },
+
+                echo(args) {
+                    const text = args.join(' ');
+
+                    // Check for redirect
+                    const redirectIdx = args.indexOf('>');
+                    if (redirectIdx !== -1 && args[redirectIdx + 1]) {
+                        const content = args.slice(0, redirectIdx).join(' ');
+                        const file = args[redirectIdx + 1];
+                        const path = PHINUX.resolvePath(file);
+
+                        PHINUX.fs[path] = {
+                            type: 'file',
+                            content: content,
+                            created: Date.now()
+                        };
+
+                        // Add to parent directory
+                        const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
+                        const fileName = path.substring(path.lastIndexOf('/') + 1);
+                        const parent = PHINUX.fs[parentPath];
+                        if (parent && !parent.contents.includes(fileName)) {
+                            parent.contents.push(fileName);
+                        }
+
+                        return '';
+                    }
+
+                    return text;
+                },
+
+                touch(args) {
+                    if (!args[0]) return `<span class="error">touch: missing file operand</span>`;
+
+                    const path = PHINUX.resolvePath(args[0]);
+                    if (PHINUX.fs[path]) {
+                        PHINUX.fs[path].created = Date.now();
+                        return '';
+                    }
+
+                    PHINUX.fs[path] = {
+                        type: 'file',
+                        content: '',
+                        created: Date.now()
+                    };
+
+                    const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
+                    const fileName = path.substring(path.lastIndexOf('/') + 1);
+                    const parent = PHINUX.fs[parentPath];
+                    if (parent && !parent.contents.includes(fileName)) {
+                        parent.contents.push(fileName);
+                    }
+
+                    return '';
+                },
+
+                mkdir(args) {
+                    if (!args[0]) return `<span class="error">mkdir: missing operand</span>`;
+
+                    const path = PHINUX.resolvePath(args[0]);
+                    if (PHINUX.fs[path]) return `<span class="error">mkdir: cannot create directory '${args[0]}': File exists</span>`;
+
+                    PHINUX.fs[path] = {
+                        type: 'dir',
+                        contents: [],
+                        created: Date.now()
+                    };
+
+                    const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
+                    const dirName = path.substring(path.lastIndexOf('/') + 1);
+                    const parent = PHINUX.fs[parentPath];
+                    if (parent && !parent.contents.includes(dirName)) {
+                        parent.contents.push(dirName);
+                    }
+
+                    return '';
+                },
+
+                rm(args) {
+                    if (!args[0]) return `<span class="error">rm: missing operand</span>`;
+
+                    const path = PHINUX.resolvePath(args[0]);
+                    const entry = PHINUX.fs[path];
+
+                    if (!entry) return `<span class="error">rm: cannot remove '${args[0]}': No such file or directory</span>`;
+                    if (entry.type === 'dir' && entry.contents.length > 0) {
+                        return `<span class="error">rm: cannot remove '${args[0]}': Directory not empty</span>`;
+                    }
+
+                    delete PHINUX.fs[path];
+
+                    const parentPath = path.substring(0, path.lastIndexOf('/')) || '/';
+                    const fileName = path.substring(path.lastIndexOf('/') + 1);
+                    const parent = PHINUX.fs[parentPath];
+                    if (parent) {
+                        parent.contents = parent.contents.filter(f => f !== fileName);
+                    }
+
+                    return '';
+                },
+
+                tree(args) {
+                    const path = args[0] ? PHINUX.resolvePath(args[0]) : PHINUX.cwd;
+
+                    const buildTree = (p, prefix = '', isLast = true) => {
+                        const entry = PHINUX.fs[p];
+                        if (!entry) return '';
+
+                        const name = p.split('/').pop() || p;
+                        let result = prefix + (isLast ? '└── ' : '├── ') +
+                                    (entry.type === 'dir' ? `<span class="info">${name}/</span>` : name) + '\n';
+
+                        if (entry.type === 'dir' && entry.contents) {
+                            entry.contents.forEach((child, i) => {
+                                const childPath = p === '/' ? '/' + child : p + '/' + child;
+                                const childPrefix = prefix + (isLast ? '    ' : '│   ');
+                                result += buildTree(childPath, childPrefix, i === entry.contents.length - 1);
+                            });
+                        }
+
+                        return result;
+                    };
+
+                    return buildTree(path).trim();
+                },
+
+                find(args) {
+                    if (!args[0]) return `<span class="error">find: missing search term</span>`;
+
+                    const results = [];
+                    const search = args[0].toLowerCase();
+
+                    for (let path in PHINUX.fs) {
+                        if (path.toLowerCase().includes(search)) {
+                            results.push(path);
+                        }
+                    }
+
+                    return results.length > 0 ? results.join('\n') : `<span class="warning">find: no matches found</span>`;
+                },
+
+                ps(args) {
+                    const showDetails = args[0] === '-l';
+
+                    if (showDetails) {
+                        let output = '<span class="info">PID    PPID   USER     CPU%  MEM%  AGE    FIT    GENES              STATE    COMMAND</span>\n';
+                        PHINUX.processes.forEach(p => {
+                            const genes = (p.genes || []).map(g => g.toString(16).toUpperCase().padStart(2, '0')).join('');
+                            const badge = p.fitness > 8 ? '<span class="badge badge-elite">ELITE</span>' :
+                                         p.fitness < 5 ? '<span class="badge badge-weak">WEAK</span>' :
+                                         '<span class="badge badge-avg">AVG</span>';
+                            output += `${p.pid.toString().padEnd(7)}${(p.ppid || '-').toString().padEnd(7)}${p.user.padEnd(9)}${p.cpu.toFixed(1).padEnd(6)}${p.mem.toFixed(1).padEnd(6)}${p.age.toString().padEnd(7)}${p.fitness.toFixed(1).padEnd(7)}${genes.padEnd(19)}<span class="success">RUNNING</span>  ${badge} ${p.name}\n`;
+                        });
+                        return output;
+                    }
+
+                    let output = '<span class="info">PID    USER     CPU%  MEM%  AGE    FIT    COMMAND</span>\n';
+                    PHINUX.processes.forEach(p => {
+                        output += `${p.pid.toString().padEnd(7)}${p.user.padEnd(9)}${p.cpu.toFixed(1).padEnd(6)}${p.mem.toFixed(1).padEnd(6)}${p.age.toString().padEnd(7)}${p.fitness.toFixed(1).padEnd(7)}${p.name}\n`;
+                    });
+                    return output;
+                },
+
+                phitop() {
+                    const avgFit = PHINUX.processes.reduce((s,p)=>s+p.fitness,0)/PHINUX.processes.length;
+
+                    let output = `<span class="phi">╔════════════════════════════════════════════════════════════╗
+║              PHITOP - Genetic Process Monitor              ║
+╚════════════════════════════════════════════════════════════╝</span>
+
+Processes: ${PHINUX.processes.length}  Running: ${PHINUX.processes.length}  Avg Fitness: ${avgFit.toFixed(2)}
+Generation: ${PHINUX.evolutionCycles}  Mutations: ${PHINUX.mutationCount}  Crossovers: ${PHINUX.crossoverCount}
+Auto-Evolve: ${PHINUX.autoEvolve ? '<span class="success">ON</span>' : '<span class="dim">OFF</span>'}
+
+<span class="info">PID    COMMAND              CPU%   MEM%   FIT    AGE    FITNESS BAR</span>\n`;
+
+                    PHINUX.processes.forEach(p => {
+                        const barLength = Math.floor(p.fitness * 2);
+                        const bar = '█'.repeat(barLength) + '░'.repeat(20 - barLength);
+                        const color = p.fitness > 8 ? 'success' : p.fitness < 5 ? 'error' : 'warning';
+                        output += `${p.pid.toString().padEnd(7)}${p.name.padEnd(21)}${p.cpu.toFixed(1).padEnd(7)}${p.mem.toFixed(1).padEnd(7)}${p.fitness.toFixed(1).padEnd(7)}${p.age.toString().padEnd(7)}<span class="${color}">${bar}</span>\n`;
+                    });
+
+                    output += `\n<span class="phi">φ-Balance: ${IPHI.toFixed(3)} | Entropy: ${PHINUX.calculateEntropy().toFixed(3)} | Selection: Active</span>`;
+                    return output;
+                },
+
+                kill(args) {
+                    if (!args[0]) return `<span class="error">kill: usage: kill <pid></span>`;
+
+                    const pid = parseInt(args[0]);
+                    const idx = PHINUX.processes.findIndex(p => p.pid === pid);
+
+                    if (idx === -1) return `<span class="error">kill: (${pid}) - No such process</span>`;
+                    if (pid === 1) return `<span class="error">kill: (1) - Cannot kill init</span>`;
+
+                    const proc = PHINUX.processes[idx];
+                    PHINUX.processes.splice(idx, 1);
+                    PHINUX.logEvolution(`Process ${pid} (${proc.name}) terminated`);
+                    return `<span class="warning">☠️  Killed process ${pid} (${proc.name})</span>`;
+                },
+
+                spawn(args) {
+                    const name = args[0] || 'process-' + PHINUX.nextPid;
+                    const proc = {
+                        pid: PHINUX.nextPid++,
+                        name: name,
+                        user: PHINUX.user,
+                        cpu: Math.random() * 2,
+                        mem: Math.random() * 3,
+                        age: 0,
+                        fitness: 3 + Math.random() * 7,
+                        genes: [
+                            Math.floor(Math.random() * 256),
+                            Math.floor(Math.random() * 256),
+                            Math.floor(Math.random() * 256),
+                            Math.floor(Math.random() * 256)
+                        ],
+                        ppid: null,
+                        generation: PHINUX.evolutionCycles
+                    };
+                    PHINUX.processes.push(proc);
+                    PHINUX.logEvolution(`Spawned process ${proc.pid} (${name})`);
+                    return `<span class="success">✓ Spawned process ${proc.pid} (${name}) - Fitness: ${proc.fitness.toFixed(2)}</span>`;
+                },
+
+                nice(args) {
+                    if (!args[0] || !args[1]) return `<span class="error">nice: usage: nice <pid> <fitness></span>`;
+
+                    const pid = parseInt(args[0]);
+                    const fitness = parseFloat(args[1]);
+                    const proc = PHINUX.processes.find(p => p.pid === pid);
+
+                    if (!proc) return `<span class="error">nice: process ${pid} not found</span>`;
+
+                    const old = proc.fitness;
+                    proc.fitness = Math.max(0, Math.min(10, fitness));
+                    return `<span class="success">Process ${pid} fitness: ${old.toFixed(2)} → ${proc.fitness.toFixed(2)}</span>`;
+                },
+
+                dna(args) {
+                    if (args[0]) {
+                        const pid = parseInt(args[0]);
+                        const proc = PHINUX.processes.find(p => p.pid === pid);
+                        if (!proc) return `<span class="error">dna: process ${pid} not found</span>`;
+
+                        return `<span class="gene">╔════════════════════════════════════════════════════════════╗
+║                    PROCESS DNA - PID ${proc.pid.toString().padEnd(4)}                   ║
+╚════════════════════════════════════════════════════════════╝</span>
+
+<span class="info">Process:</span> ${proc.name} (PID ${proc.pid})
+<span class="info">Parent:</span> ${proc.ppid || 'N/A'}
+<span class="info">Generation:</span> ${proc.generation || 0}
+<span class="info">Age:</span> ${proc.age} cycles
+<span class="info">Fitness:</span> ${proc.fitness.toFixed(2)} / 10.00
+
+<span class="gene">Genetic Code:</span>
+  Gene[0]: 0x${(proc.genes[0] || 0).toString(16).toUpperCase().padStart(2, '0')}  (cpu_efficiency)
+  Gene[1]: 0x${(proc.genes[1] || 0).toString(16).toUpperCase().padStart(2, '0')}  (memory_management)
+  Gene[2]: 0x${(proc.genes[2] || 0).toString(16).toUpperCase().padStart(2, '0')}  (adaptability)
+  Gene[3]: 0x${(proc.genes[3] || 0).toString(16).toUpperCase().padStart(2, '0')}  (survival_instinct)
+
+<span class="info">Phenotype:</span>
+  CPU Usage: ${proc.cpu.toFixed(2)}%
+  Memory: ${proc.mem.toFixed(2)} MB
+  ${proc.fitness > 8 ? '<span class="success">ELITE</span>' : proc.fitness < 5 ? '<span class="error">WEAK</span>' : '<span class="warning">AVERAGE</span>'}`;
+                    }
+
+                    return `<span class="gene">╔════════════════════════════════════════════════════════════╗
+║                    SYSTEM DNA STRUCTURE                     ║
+╚════════════════════════════════════════════════════════════╝</span>
+
+<span class="phi">Generation:</span> ${PHINUX.evolutionCycles}
+<span class="phi">φ-Value:</span> ${PHI.toFixed(15)}
+<span class="phi">Entropy:</span> ${PHINUX.calculateEntropy().toFixed(15)}
+
+<span class="gene">Evolution Stats:</span>
+  Total Processes: ${PHINUX.processes.length}
+  Average Fitness: ${(PHINUX.processes.reduce((s,p)=>s+p.fitness,0)/PHINUX.processes.length).toFixed(2)}
+  Best Fitness: ${Math.max(...PHINUX.processes.map(p => p.fitness)).toFixed(2)}
+  Worst Fitness: ${Math.min(...PHINUX.processes.map(p => p.fitness)).toFixed(2)}
+
+  Generations: ${PHINUX.evolutionCycles}
+  Mutations Applied: ${PHINUX.mutationCount}
+  Crossovers: ${PHINUX.crossoverCount}
+
+<span class="gene">Population Distribution:</span>
+  Elite (>8.0): ${PHINUX.processes.filter(p => p.fitness > 8).length}
+  Average (5-8): ${PHINUX.processes.filter(p => p.fitness >= 5 && p.fitness <= 8).length}
+  Weak (<5.0): ${PHINUX.processes.filter(p => p.fitness < 5).length}
+
+Type <span class="success">dna &lt;pid&gt;</span> to see specific process DNA.`;
+                },
+
+                evolve(args) {
+                    const cycles = args[0] ? parseInt(args[0]) : 1;
+                    let output = `<span class="gene">🧬 EVOLUTION CYCLE${cycles > 1 ? 'S' : ''}</span>\n\n`;
+
+                    for (let i = 0; i < cycles; i++) {
+                        if (PHINUX.processes.length < 2) {
+                            output += `<span class="warning">Need at least 2 processes to evolve</span>`;
+                            break;
+                        }
+
+                        // Tournament selection
+                        const tournament = () => {
+                            const a = PHINUX.processes[Math.floor(Math.random() * PHINUX.processes.length)];
+                            const b = PHINUX.processes[Math.floor(Math.random() * PHINUX.processes.length)];
+                            return a.fitness > b.fitness ? a : b;
+                        };
+
+                        const p1 = tournament();
+                        const p2 = tournament();
+
+                        // Crossover
+                        const child = {
+                            pid: PHINUX.nextPid++,
+                            name: `gen${PHINUX.evolutionCycles}-${PHINUX.nextPid}`,
+                            user: PHINUX.user,
+                            cpu: (p1.cpu + p2.cpu) / 2 + (Math.random() - 0.5) * 0.5,
+                            mem: (p1.mem + p2.mem) / 2 + (Math.random() - 0.5) * 0.5,
+                            age: 0,
+                            fitness: (p1.fitness + p2.fitness) / 2 + (Math.random() - 0.5) * 2,
+                            genes: [
+                                Math.random() < 0.5 ? p1.genes[0] : p2.genes[0],
+                                Math.random() < 0.5 ? p1.genes[1] : p2.genes[1],
+                                Math.random() < 0.5 ? p1.genes[2] : p2.genes[2],
+                                Math.random() < 0.5 ? p1.genes[3] : p2.genes[3]
+                            ],
+                            ppid: p1.pid,
+                            generation: PHINUX.evolutionCycles + 1
+                        };
+
+                        child.fitness = Math.max(0, Math.min(10, child.fitness));
+
+                        PHINUX.processes.push(child);
+                        PHINUX.evolutionCycles++;
+                        PHINUX.crossoverCount++;
+
+                        if (cycles === 1 || i === cycles - 1) {
+                            output += `<span class="success">Generation ${PHINUX.evolutionCycles}:</span>\n`;
+                            output += `  Parents: ${p1.pid} (fit=${p1.fitness.toFixed(2)}) × ${p2.pid} (fit=${p2.fitness.toFixed(2)})\n`;
+                            output += `  Child: ${child.pid} (fit=${child.fitness.toFixed(2)})\n`;
+                        }
+
+                        PHINUX.logEvolution(`Evolution: ${p1.pid}×${p2.pid} → ${child.pid} (fit=${child.fitness.toFixed(2)})`);
+                    }
+
+                    output += `\n<span class="info">Population:</span> ${PHINUX.processes.length} processes`;
+                    output += `\n<span class="info">Avg Fitness:</span> ${(PHINUX.processes.reduce((s,p)=>s+p.fitness,0)/PHINUX.processes.length).toFixed(2)}`;
+
+                    PHINUX.updateStatusBar();
+                    return output;
+                },
+
+                mutate(args) {
+                    const rate = args[0] ? parseFloat(args[0]) : 0.3;
+                    let mutated = 0;
+
+                    PHINUX.processes.forEach(p => {
+                        if (Math.random() < rate && p.pid !== 1) {
+                            // Mutate genes
+                            p.genes = p.genes.map(g => {
+                                if (Math.random() < 0.3) {
+                                    return (g + Math.floor((Math.random() - 0.5) * 50)) & 0xFF;
+                                }
+                                return g;
+                            });
+
+                            // Mutate traits
+                            p.cpu = Math.max(0, p.cpu + (Math.random() - 0.5) * 2);
+                            p.mem = Math.max(0, p.mem + (Math.random() - 0.5) * 2);
+                            p.fitness = Math.max(0, Math.min(10, p.fitness + (Math.random() - 0.5) * 4));
+                            mutated++;
+                            PHINUX.mutationCount++;
+                        }
+                    });
+
+                    PHINUX.logEvolution(`Mutation applied: ${mutated} processes affected`);
+                    PHINUX.updateStatusBar();
+
+                    return `<span class="gene">⚡ MUTATION WAVE</span>
+
+<span class="success">Mutation Rate:</span> ${(rate * 100).toFixed(0)}%
+<span class="success">Processes Mutated:</span> ${mutated}/${PHINUX.processes.length}
+<span class="success">Total Mutations:</span> ${PHINUX.mutationCount}
+<span class="info">Genetic Diversity:</span> ${mutated > 0 ? '<span class="success">Increased ↑</span>' : '<span class="dim">Stable →</span>'}`;
+                },
+
+                breed(args) {
+                    if (!args[0] || !args[1]) return `<span class="error">breed: usage: breed <pid1> <pid2></span>`;
+
+                    const p1 = PHINUX.processes.find(p => p.pid === parseInt(args[0]));
+                    const p2 = PHINUX.processes.find(p => p.pid === parseInt(args[1]));
+
+                    if (!p1 || !p2) return `<span class="error">breed: process not found</span>`;
+
+                    const child = {
+                        pid: PHINUX.nextPid++,
+                        name: `${p1.name.split('-')[0]}-${p2.name.split('-')[0]}-hybrid`,
+                        user: PHINUX.user,
+                        cpu: (p1.cpu + p2.cpu) / 2,
+                        mem: (p1.mem + p2.mem) / 2,
+                        age: 0,
+                        fitness: (p1.fitness + p2.fitness) / 2 * 1.1, // Small hybrid vigor
+                        genes: [
+                            (p1.genes[0] + p2.genes[0]) >> 1,
+                            (p1.genes[1] + p2.genes[1]) >> 1,
+                            (p1.genes[2] + p2.genes[2]) >> 1,
+                            (p1.genes[3] + p2.genes[3]) >> 1
+                        ],
+                        ppid: p1.pid,
+                        generation: Math.max(p1.generation || 0, p2.generation || 0) + 1
+                    };
+
+                    child.fitness = Math.min(10, child.fitness);
+                    PHINUX.processes.push(child);
+                    PHINUX.crossoverCount++;
+                    PHINUX.logEvolution(`Breeding: ${p1.pid}×${p2.pid} → ${child.pid}`);
+                    PHINUX.updateStatusBar();
+
+                    return `<span class="success">🧬 Hybrid Created</span>
+
+<span class="info">Parents:</span>
+  ${p1.name} (PID ${p1.pid}, Fit=${p1.fitness.toFixed(2)})
+  ${p2.name} (PID ${p2.pid}, Fit=${p2.fitness.toFixed(2)})
+
+<span class="success">Offspring:</span>
+  ${child.name} (PID ${child.pid}, Fit=${child.fitness.toFixed(2)})
+  Generation: ${child.generation}
+
+<span class="phi">Hybrid Vigor: ${((child.fitness / ((p1.fitness + p2.fitness) / 2) - 1) * 100).toFixed(1)}%</span>`;
+                },
+
+                cull(args) {
+                    const threshold = args[0] ? parseFloat(args[0]) : null;
+                    const avgFitness = PHINUX.processes.reduce((s, p) => s + p.fitness, 0) / PHINUX.processes.length;
+                    const cutoff = threshold !== null ? threshold : avgFitness;
+
+                    const weak = PHINUX.processes.filter(p => p.fitness < cutoff && p.pid !== 1);
+                    PHINUX.processes = PHINUX.processes.filter(p => p.fitness >= cutoff || p.pid === 1);
+
+                    const fittest = PHINUX.processes.reduce((best, p) => p.fitness > best.fitness ? p : best);
+
+                    PHINUX.logEvolution(`Natural selection: ${weak.length} processes culled`);
+                    PHINUX.updateStatusBar();
+
+                    return `<span class="warning">☠️  NATURAL SELECTION</span>
+
+<span class="info">Fitness Threshold:</span> ${cutoff.toFixed(2)}
+<span class="info">Culled:</span> ${weak.length} weak processes
+<span class="info">Survivors:</span> ${PHINUX.processes.length}
+<span class="success">Fittest:</span> ${fittest.name} (PID ${fittest.pid}, Fit=${fittest.fitness.toFixed(2)})
+<span class="phi">Selection Pressure:</span> ${(weak.length / (weak.length + PHINUX.processes.length) * 100).toFixed(1)}%`;
+                },
+
+                genealogy(args) {
+                    const pid = args[0] ? parseInt(args[0]) : null;
+
+                    if (pid) {
+                        const proc = PHINUX.processes.find(p => p.pid === pid);
+                        if (!proc) return `<span class="error">genealogy: process ${pid} not found</span>`;
+
+                        let output = `<span class="gene">📜 PROCESS GENEALOGY - PID ${pid}</span>\n\n`;
+
+                        // Find ancestors
+                        let current = proc;
+                        let depth = 0;
+                        output += `<span class="info">${proc.name} (PID ${proc.pid})</span>\n`;
+
+                        while (current.ppid && depth < 10) {
+                            const parent = PHINUX.processes.find(p => p.pid === current.ppid);
+                            if (!parent) break;
+                            depth++;
+                            output += `${'  '.repeat(depth)}└─ ${parent.name} (PID ${parent.pid})\n`;
+                            current = parent;
+                        }
+
+                        // Find children
+                        const children = PHINUX.processes.filter(p => p.ppid === pid);
+                        if (children.length > 0) {
+                            output += `\n<span class="info">Children:</span>\n`;
+                            children.forEach(c => {
+                                output += `  • ${c.name} (PID ${c.pid}, Gen ${c.generation || 0})\n`;
+                            });
+                        }
+
+                        return output;
+                    }
+
+                    // Show family tree
+                    let output = `<span class="gene">🌳 POPULATION FAMILY TREE</span>\n\n`;
+
+                    const roots = PHINUX.processes.filter(p => !p.ppid);
+                    const buildTree = (proc, prefix = '') => {
+                        let result = `${prefix}${proc.name} (${proc.pid}) [fit=${proc.fitness.toFixed(1)}]\n`;
+                        const children = PHINUX.processes.filter(p => p.ppid === proc.pid);
+                        children.forEach((child, i) => {
+                            const isLast = i === children.length - 1;
+                            result += buildTree(child, prefix + (isLast ? '  └─ ' : '  ├─ '));
+                        });
+                        return result;
+                    };
+
+                    roots.forEach(root => {
+                        output += buildTree(root);
+                    });
+
+                    return output;
+                },
+
+                auto(args) {
+                    if (args[0] === 'on') {
+                        PHINUX.autoEvolve = true;
+                        PHINUX.startAutoEvolution();
+                        return `<span class="success">✓ Auto-evolution ENABLED</span>\nProcesses will evolve automatically every 10 seconds.`;
+                    } else if (args[0] === 'off') {
+                        PHINUX.autoEvolve = false;
+                        return `<span class="warning">Auto-evolution DISABLED</span>`;
+                    }
+                    return `<span class="info">Auto-evolution: ${PHINUX.autoEvolve ? 'ON' : 'OFF'}</span>\nUsage: auto [on|off]`;
+                },
+
+                entropy() {
+                    const fits = PHINUX.processes.map(p => p.fitness);
+                    const mean = fits.reduce((a, b) => a + b, 0) / fits.length;
+                    const variance = fits.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / fits.length;
+                    const entropy = PHINUX.calculateEntropy();
+
+                    return `<span class="phi">╔════════════════════════════════════════════════════════════╗
+║                    ENTROPY STATUS                           ║
+╚════════════════════════════════════════════════════════════╝</span>
+
+<span class="info">Current Entropy:</span> ${entropy.toFixed(6)}
+<span class="info">Target Entropy:</span> ${IPHI.toFixed(6)}
+<span class="info">Deviation:</span> ${Math.abs(entropy - IPHI).toFixed(6)}
+
+<span class="phi">System Phase:</span> ${Math.abs(entropy - IPHI) < 0.1 ? '<span class="success">⚖️  EQUILIBRIUM</span>' : '<span class="warning">⚠️  SEEKING</span>'}
+
+<span class="gene">Statistical Analysis:</span>
+  Process Variance: ${variance.toFixed(2)}
+  Fitness Mean: ${mean.toFixed(2)}
+  Fitness Std Dev: ${Math.sqrt(variance).toFixed(2)}
+  Population: ${PHINUX.processes.length}
+  Diversity Index: ${(variance / mean).toFixed(3)}
+
+${entropy < IPHI - 0.1 ? '<span class="warning">⚠️  Too much order - system stagnating\n   Recommendation: mutate 0.5</span>' :
+  entropy > IPHI + 0.1 ? '<span class="warning">⚠️  Too much chaos - low fitness\n   Recommendation: cull</span>' :
+  '<span class="success">✓ Optimal φ-balance achieved\n   System evolving efficiently</span>'}`;
+                },
+
+                graph(args) {
+                    const type = args[0] || 'bar';
+
+                    if (type === 'bar') {
+                        let output = `<span class="phi">FITNESS DISTRIBUTION (Bar Graph)</span>\n\n`;
+
+                        PHINUX.processes.slice().sort((a, b) => b.fitness - a.fitness).forEach(p => {
+                            const barLength = Math.floor(p.fitness * 5);
+                            const bar = '█'.repeat(barLength);
+                            const color = p.fitness > 8 ? 'success' : p.fitness < 5 ? 'error' : 'warning';
+                            output += `${p.pid.toString().padStart(3)} ${p.name.padEnd(20)} <span class="${color}">${bar}</span> ${p.fitness.toFixed(2)}\n`;
+                        });
+
+                        return output;
+                    }
+
+                    if (type === 'hist') {
+                        let output = `<span class="phi">FITNESS HISTOGRAM</span>\n\n`;
+                        const buckets = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                        PHINUX.processes.forEach(p => {
+                            const bucket = Math.min(9, Math.floor(p.fitness));
+                            buckets[bucket]++;
+                        });
+
+                        const maxCount = Math.max(...buckets);
+                        for (let i = 9; i >= 0; i--) {
+                            const count = buckets[i];
+                            const bar = '▓'.repeat(Math.floor(count / maxCount * 40));
+                            output += `${i.toFixed(1)}-${(i + 1).toFixed(1)} ${bar} ${count}\n`;
+                        });
+
+                        return output;
+                    }
+
+                    return `<span class="error">Unknown graph type. Use: bar, hist</span>`;
+                },
+
+                stats() {
+                    const fits = PHINUX.processes.map(p => p.fitness);
+                    const mean = fits.reduce((a, b) => a + b) / fits.length;
+                    const variance = fits.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / fits.length;
+                    const stddev = Math.sqrt(variance);
+                    const min = Math.min(...fits);
+                    const max = Math.max(...fits);
+                    const median = fits.sort((a, b) => a - b)[Math.floor(fits.length / 2)];
+
+                    return `<span class="phi">╔════════════════════════════════════════════════════════════╗
+║                 POPULATION STATISTICS                       ║
+╚════════════════════════════════════════════════════════════╝</span>
+
+<span class="info">Sample Size:</span> ${PHINUX.processes.length} processes
+<span class="info">Generation:</span> ${PHINUX.evolutionCycles}
+
+<span class="gene">Fitness Metrics:</span>
+  Mean:       ${mean.toFixed(3)}
+  Median:     ${median.toFixed(3)}
+  Std Dev:    ${stddev.toFixed(3)}
+  Variance:   ${variance.toFixed(3)}
+  Min:        ${min.toFixed(3)}
+  Max:        ${max.toFixed(3)}
+  Range:      ${(max - min).toFixed(3)}
+
+<span class="gene">Evolution Metrics:</span>
+  Total Mutations:  ${PHINUX.mutationCount}
+  Total Crossovers: ${PHINUX.crossoverCount}
+  Mutation Rate:    ${(PHINUX.mutationCount / Math.max(1, PHINUX.evolutionCycles) * 100).toFixed(1)}%
+
+<span class="gene">Distribution:</span>
+  Elite (>8.0):    ${PHINUX.processes.filter(p => p.fitness > 8).length} (${(PHINUX.processes.filter(p => p.fitness > 8).length / PHINUX.processes.length * 100).toFixed(1)}%)
+  Average (5-8):   ${PHINUX.processes.filter(p => p.fitness >= 5 && p.fitness <= 8).length} (${(PHINUX.processes.filter(p => p.fitness >= 5 && p.fitness <= 8).length / PHINUX.processes.length * 100).toFixed(1)}%)
+  Weak (<5.0):     ${PHINUX.processes.filter(p => p.fitness < 5).length} (${(PHINUX.processes.filter(p => p.fitness < 5).length / PHINUX.processes.length * 100).toFixed(1)}%)`;
+                },
+
+                compare(args) {
+                    if (!args[0] || !args[1]) return `<span class="error">compare: usage: compare <pid1> <pid2></span>`;
+
+                    const p1 = PHINUX.processes.find(p => p.pid === parseInt(args[0]));
+                    const p2 = PHINUX.processes.find(p => p.pid === parseInt(args[1]));
+
+                    if (!p1 || !p2) return `<span class="error">compare: process not found</span>`;
+
+                    const similarity = PHINUX.calculateSimilarity(p1, p2);
+
+                    return `<span class="phi">PROCESS COMPARISON</span>
+
+<span class="info">Process 1:</span> ${p1.name} (PID ${p1.pid})
+  Fitness: ${p1.fitness.toFixed(2)}
+  Age: ${p1.age}
+  Genes: ${p1.genes.map(g => g.toString(16).toUpperCase().padStart(2, '0')).join(' ')}
+
+<span class="info">Process 2:</span> ${p2.name} (PID ${p2.pid})
+  Fitness: ${p2.fitness.toFixed(2)}
+  Age: ${p2.age}
+  Genes: ${p2.genes.map(g => g.toString(16).toUpperCase().padStart(2, '0')).join(' ')}
+
+<span class="gene">Analysis:</span>
+  Fitness Difference: ${Math.abs(p1.fitness - p2.fitness).toFixed(2)}
+  Genetic Similarity: ${(similarity * 100).toFixed(1)}%
+  ${p1.fitness > p2.fitness ? `${p1.name} is superior` : p2.fitness > p1.fitness ? `${p2.name} is superior` : 'Equal fitness'}`;
+                },
+
+                phi() {
+                    return `<span class="phi">The Golden Ratio (φ)</span>
+
+φ = ${PHI.toFixed(15)}
+φ⁻¹ = ${IPHI.toFixed(15)}
+
+φ² = φ + 1 = ${(PHI * PHI).toFixed(15)}
+φ - 1 = φ⁻¹ = ${(PHI - 1).toFixed(15)}
+
+<span class="info">Properties:</span>
+- Appears in nature (shells, flowers, galaxies)
+- Fibonacci ratios converge to φ
+- Used in art and architecture
+- Optimal for entropy balance
+- Self-similar at all scales
+
+In PHINUX, φ governs process scheduling and entropy.`;
+                },
+
+                fibonacci(args) {
+                    const n = args[0] ? parseInt(args[0]) : 15;
+                    const fib = [0, 1];
+
+                    for (let i = 2; i <= n; i++) {
+                        fib.push(fib[i - 1] + fib[i - 2]);
+                    }
+
+                    return `<span class="phi">Fibonacci Sequence (0 to ${n}):</span>
+
+${fib.join(', ')}
+
+<span class="info">Ratio of consecutive terms:</span>
+${fib.slice(-5, -1).map((v, i) => `F(${n - 4 + i + 1})/F(${n - 4 + i}) = ${(fib[n - 4 + i + 1] / v).toFixed(6)}`).join('\n')}
+
+Converges to φ = ${PHI.toFixed(6)}`;
+                },
+
+                spiral(args) {
+                    const size = args[0] ? parseInt(args[0]) : 8;
+                    const fib = [1, 1];
+                    for (let i = 2; i < size; i++) {
+                        fib.push(fib[i - 1] + fib[i - 2]);
+                    }
+
+                    let output = `<span class="phi">🌀 FIBONACCI SPIRAL</span>\n\n`;
+
+                    // ASCII art spiral
+                    const symbols = ['▓', '▒', '░', '·'];
+                    for (let i = 0; i < fib.length; i++) {
+                        const symbol = symbols[i % symbols.length];
+                        output += symbol.repeat(fib[i]) + '\n';
+                    }
+
+                    output += `\n<span class="info">Sequence:</span> ${fib.join(' → ')}`;
+                    return output;
+                },
+
+                fortune() {
+                    const fortunes = [
+                        "φ teaches us: perfection lies not in symmetry, but in balance.",
+                        "The golden ratio appears where chaos meets order.",
+                        "Nature computes with φ, not π. It optimizes for growth, not circles.",
+                        "A system that seeks φ never stops evolving.",
+                        "Entropy at 0.618 is not a goal, but a dance.",
+                        "Mutation is not error - it's exploration.",
+                        "The fittest process is not the strongest, but the most adaptable.",
+                        "φ² = φ + 1: Growth comes from adding to what already exists.",
+                        "In nature, there is no garbage collection. Only evolution.",
+                        "The golden ratio is the cosmos optimizing itself.",
+                        "Stability freezes. Equilibrium flows.",
+                        "Every Fibonacci number is the sum of its ancestors.",
+                        "φ is irrational, and so oscillation is eternal.",
+                        "A truly random system is as dead as a perfectly ordered one.",
+                        "Evolution is not progress toward a goal, but adaptation to change.",
+                        "The strongest genome is the one most flexible to mutation.",
+                        "In the garden of forking paths, φ is the optimal angle of branching.",
+                        "Survival of the fittest means survival of the most balanced.",
+                        "Chaos without order is noise. Order without chaos is death.",
+                        "The universe doesn't optimize for perfection, but for φ."
+                    ];
+
+                    return `<span class="phi">✨ φ Fortune Cookie:</span>
+
+"<span class="gene">${fortunes[Math.floor(Math.random() * fortunes.length)]}</span>"
+
+    - PHINUX v1.618 [ENHANCED]`;
+                },
+
+                history() {
+                    return PHINUX.history.map((cmd, i) => `${(i + 1).toString().padStart(4)} ${cmd}`).join('\n');
+                },
+
+                alias(args) {
+                    if (!args[0]) {
+                        let output = '<span class="info">Current Aliases:</span>\n';
+                        for (let name in PHINUX.aliases) {
+                            output += `  ${name}='${PHINUX.aliases[name]}'\n`;
+                        }
+                        return output || '<span class="dim">No aliases defined</span>';
+                    }
+
+                    const [name, ...cmd] = args;
+                    if (cmd.length === 0) {
+                        return PHINUX.aliases[name] ? `${name}='${PHINUX.aliases[name]}'` : `<span class="error">alias: ${name}: not found</span>`;
+                    }
+
+                    PHINUX.aliases[name] = cmd.join(' ');
+                    return `<span class="success">Alias created: ${name}='${PHINUX.aliases[name]}'</span>`;
+                },
+
+                man(args) {
+                    if (!args[0]) return `<span class="info">What manual page do you want?</span>`;
+
+                    const pages = {
+                        evolve: `<span class="gene">EVOLVE(1)                PHINUX User Commands                EVOLVE(1)</span>
+
+NAME
+       evolve - trigger natural selection on processes
+
+SYNOPSIS
+       evolve [cycles]
+
+DESCRIPTION
+       Performs tournament selection on the process population, selecting
+       two parents and producing offspring through genetic crossover.
+
+       The child process inherits traits from both parents and is added
+       to the population. Fitness determines selection probability.
+
+ALGORITHM
+       1. Tournament selection (best of 2 random processes)
+       2. Uniform crossover of CPU, memory, fitness, genes
+       3. Child spawned with combined characteristics
+       4. Optional mutation of offspring
+
+OPTIONS
+       cycles   Number of evolution cycles to perform (default: 1)
+
+SEE ALSO
+       mutate(1), breed(1), cull(1), phitop(1), auto(1)`,
+
+                        phi: `<span class="phi">PHI(1)                   PHINUX User Commands                PHI(1)</span>
+
+NAME
+       phi - display golden ratio information
+
+SYNOPSIS
+       phi
+
+DESCRIPTION
+       Displays the golden ratio (φ) and its properties. The golden ratio
+       is approximately 1.618033988749 and appears throughout nature,
+       mathematics, art, and this operating system.
+
+       φ = (1 + √5) / 2
+       φ⁻¹ = φ - 1 ≈ 0.618
+       φ² = φ + 1
+
+PROPERTIES
+       φ appears in Fibonacci sequences, fractal patterns, optimal
+       packing solutions, and natural growth patterns.
+
+       In PHINUX, φ governs entropy balance and process scheduling.
+
+SEE ALSO
+       fibonacci(1), entropy(1), spiral(1)`,
+
+                        auto: `<span class="gene">AUTO(1)                  PHINUX User Commands                AUTO(1)</span>
+
+NAME
+       auto - toggle automatic evolution
+
+SYNOPSIS
+       auto [on|off]
+
+DESCRIPTION
+       Enables or disables automatic evolution of the process population.
+       When enabled, the system will automatically perform evolution
+       cycles every 10 seconds.
+
+       This allows the population to evolve continuously in the
+       background while you work on other tasks.
+
+OPTIONS
+       on       Enable automatic evolution
+       off      Disable automatic evolution
+
+EXAMPLES
+       auto on      # Enable auto-evolution
+       auto off     # Disable auto-evolution
+       auto         # Show current status
+
+SEE ALSO
+       evolve(1), phitop(1)`
+                    };
+
+                    return pages[args[0]] || `<span class="error">No manual entry for ${args[0]}</span>`;
+                },
+
+                ping(args) {
+                    const host = args[0] || 'localhost';
+                    return `PING ${host} (${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}): 56 data bytes
+64 bytes from ${host}: icmp_seq=0 ttl=64 time=${(Math.random() * 10).toFixed(2)} ms
+64 bytes from ${host}: icmp_seq=1 ttl=64 time=${(Math.random() * 10).toFixed(2)} ms
+64 bytes from ${host}: icmp_seq=2 ttl=64 time=${(Math.random() * 10).toFixed(2)} ms
+
+--- ${host} ping statistics ---
+3 packets transmitted, 3 packets received, 0% packet loss`;
+                },
+
+                ifconfig() {
+                    return `eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet ${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}  netmask 255.255.255.0  broadcast ${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.${Math.floor(Math.random()*255)}.255
+        ether ${Math.floor(Math.random()*16).toString(16)}${Math.floor(Math.random()*16).toString(16)}:${Math.floor(Math.random()*16).toString(16)}${Math.floor(Math.random()*16).toString(16)}:${Math.floor(Math.random()*16).toString(16)}${Math.floor(Math.random()*16).toString(16)}:${Math.floor(Math.random()*16).toString(16)}${Math.floor(Math.random()*16).toString(16)}:${Math.floor(Math.random()*16).toString(16)}${Math.floor(Math.random()*16).toString(16)}:${Math.floor(Math.random()*16).toString(16)}${Math.floor(Math.random()*16).toString(16)}  txqueuelen 1000
+        RX packets ${Math.floor(Math.random()*10000)}  bytes ${Math.floor(Math.random()*1000000)} (${(Math.random()*100).toFixed(1)} MB)
+        TX packets ${Math.floor(Math.random()*10000)}  bytes ${Math.floor(Math.random()*1000000)} (${(Math.random()*100).toFixed(1)} MB)`;
+                }
+            },
+
+            // Helper functions
+            resolvePath(path) {
+                if (path.startsWith('/')) return path;
+                if (path === '.') return this.cwd;
+                if (path === '..') {
+                    const parts = this.cwd.split('/').filter(p => p);
+                    parts.pop();
+                    return '/' + parts.join('/') || '/';
+                }
+                return this.cwd === '/' ? '/' + path : this.cwd + '/' + path;
+            },
+
+            getPrompt() {
+                const shortPath = this.cwd.replace('/home/' + this.user, '~');
+                return `<span class="prompt">${this.user}@${this.hostname}:<span class="info">${shortPath}</span>$ </span>`;
+            },
+
+            print(text, newline = true) {
+                const history = document.getElementById('history');
+                history.innerHTML += text + (newline ? '\n' : '');
+                const terminal = document.getElementById('terminal');
+                terminal.scrollTop = terminal.scrollHeight;
+            },
+
+            exec(cmd) {
+                cmd = cmd.trim();
+                if (!cmd) return;
+
+                this.history.push(cmd);
+                this.historyIndex = this.history.length;
+
+                // Check aliases
+                const firstWord = cmd.split(/\s+/)[0];
+                if (this.aliases[firstWord]) {
+                    cmd = this.aliases[firstWord] + cmd.substring(firstWord.length);
+                }
+
+                this.print(this.getPrompt() + cmd, true);
+
+                const parts = cmd.split(/\s+/);
+                const command = parts[0];
+                const args = parts.slice(1);
+
+                if (this.commands[command]) {
+                    const output = this.commands[command](args);
+                    if (output) this.print(output, true);
+                } else {
+                    this.print(`<span class="error">phinux: command not found: ${command}</span>`, true);
+                    this.print(`<span class="warning">Type 'help' for available commands</span>`, true);
+                }
+
+                document.getElementById('ps1').innerHTML = this.getPrompt();
+                this.processes.forEach(p => p.age++);
+                this.updateStatusBar();
+            },
+
+            calculateEntropy() {
+                const fits = this.processes.map(p => p.fitness);
+                const mean = fits.reduce((a, b) => a + b, 0) / fits.length;
+                const variance = fits.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / fits.length;
+                return Math.min(1, variance / 100);
+            },
+
+            calculateSimilarity(p1, p2) {
+                let matches = 0;
+                for (let i = 0; i < 4; i++) {
+                    const diff = Math.abs(p1.genes[i] - p2.genes[i]);
+                    matches += (255 - diff) / 255;
+                }
+                return matches / 4;
+            },
+
+            logEvolution(message) {
+                const log = this.fs['/var/log/evolution.log'];
+                if (log) {
+                    const timestamp = new Date().toISOString();
+                    log.content += `[${timestamp}] ${message}\n`;
+                }
+            },
+
+            updateStatusBar() {
+                document.getElementById('phi-value').textContent = PHI.toFixed(3);
+                document.getElementById('proc-count').textContent = this.processes.length;
+                const avgFit = this.processes.reduce((s,p)=>s+p.fitness,0)/this.processes.length;
+                document.getElementById('avg-fitness').textContent = avgFit.toFixed(2);
+                document.getElementById('entropy-value').textContent = this.calculateEntropy().toFixed(3);
+                document.getElementById('generation').textContent = this.evolutionCycles;
+
+                const uptime = Math.floor((Date.now() - this.generation) / 1000);
+                document.getElementById('uptime').textContent = uptime < 60 ? `${uptime}s` : `${Math.floor(uptime / 60)}m`;
+            },
+
+            startAutoEvolution() {
+                if (this.autoEvolveTimer) return;
+
+                this.autoEvolveTimer = setInterval(() => {
+                    if (!this.autoEvolve) {
+                        clearInterval(this.autoEvolveTimer);
+                        this.autoEvolveTimer = null;
+                        return;
+                    }
+
+                    if (this.processes.length >= 2) {
+                        this.commands.evolve([]);
+                    }
+                }, 10000);
+            },
+
+            tabComplete(partial) {
+                const commands = Object.keys(this.commands);
+                const matches = commands.filter(cmd => cmd.startsWith(partial));
+                return matches.length === 1 ? matches[0] : partial;
+            },
+
+            init() {
+                // Boot sequence
+                this.print('<span class="boot">╔════════════════════════════════════════════════════════════╗</span>', true);
+                this.print('<span class="boot">║    PHINUX v1.618 [ENHANCED] - Φ-Based Genetic Linux       ║</span>', true);
+                this.print('<span class="boot">╚════════════════════════════════════════════════════════════╝</span>', true);
+                this.print('<span class="dim">Copyright (C) ' + new Date().getFullYear() + ' Golden Ratio Computing Foundation</span>', true);
+                this.print('', true);
+                this.print('<span class="phi pulse">Initializing φ-core...</span> <span class="success">[  OK  ]</span>', true);
+                this.print('<span class="phi">Starting genetic scheduler...</span> <span class="success">[  OK  ]</span>', true);
+                this.print('<span class="phi">Loading entropy balancer...</span> <span class="success">[  OK  ]</span>', true);
+                this.print('<span class="phi">Mounting fractal filesystem...</span> <span class="success">[  OK  ]</span>', true);
+                this.print('<span class="gene">Initializing DNA sequencer...</span> <span class="success">[  OK  ]</span>', true);
+                this.print('', true);
+                this.print(`<span class="success">✓ Login successful. Welcome to PHINUX!</span>`, true);
+                this.print(`<span class="info">Type 'help' for commands or 'cat ~/README.phi' to get started.</span>`, true);
+                this.print(`<span class="warning">NEW: Try 'auto on' for automatic evolution!</span>`, true);
+                this.print('', true);
+
+                document.getElementById('ps1').innerHTML = this.getPrompt();
+                this.updateStatusBar();
+
+                const input = document.getElementById('input');
+
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        const cmd = input.value;
+                        input.value = '';
+                        this.exec(cmd);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        if (this.historyIndex > 0) {
+                            this.historyIndex--;
+                            input.value = this.history[this.historyIndex];
+                        }
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        if (this.historyIndex < this.history.length - 1) {
+                            this.historyIndex++;
+                            input.value = this.history[this.historyIndex];
+                        } else {
+                            this.historyIndex = this.history.length;
+                            input.value = '';
+                        }
+                    } else if (e.key === 'Tab') {
+                        e.preventDefault();
+                        const partial = input.value.split(/\s+/).pop();
+                        const completed = this.tabComplete(partial);
+                        if (completed !== partial) {
+                            const parts = input.value.split(/\s+/);
+                            parts[parts.length - 1] = completed;
+                            input.value = parts.join(' ');
+                        }
+                    }
+                });
+
+                document.addEventListener('click', () => input.focus());
+                input.focus();
+
+                // Update status bar periodically
+                setInterval(() => this.updateStatusBar(), 1000);
+            }
+        };
+
+        window.addEventListener('load', () => PHINUX.init());
+    </script>
+</body>
+</html>
