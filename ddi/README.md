@@ -135,7 +135,11 @@ ddi/
     ├── waves.md            # Wave physics simulation
     ├── solar-system.md     # Orbital mechanics
     ├── fireworks.md        # Particle system explosions
-    └── cyberpunk-city.md   # Procedural city generation
+    ├── cyberpunk-city.md   # Procedural city generation
+    ├── aurora.md           # Northern Lights phenomena
+    ├── dna-helix.md        # Molecular biology
+    ├── lightning.md        # Electrical storm system
+    └── galaxy.md           # Spiral galaxy dynamics
 ```
 
 ## 🔧 API Reference
