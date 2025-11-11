@@ -131,7 +131,11 @@ ddi/
     ├── particle-swarm.md   # Swarm optimization
     ├── fractals.md         # L-system fractal trees
     ├── voxel-world.md      # Procedural voxel generation
-    └── api.md              # REST API system setup
+    ├── api.md              # REST API system setup
+    ├── waves.md            # Wave physics simulation
+    ├── solar-system.md     # Orbital mechanics
+    ├── fireworks.md        # Particle system explosions
+    └── cyberpunk-city.md   # Procedural city generation
 ```
 
 ## 🔧 API Reference
