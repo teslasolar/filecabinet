@@ -121,12 +121,17 @@ cluster(window.config.points);
 
 ```
 ddi/
-├── index.html          # DDI browser/runner
-├── runner.js           # Core DDI engine
-├── README.md           # This file
+├── index.html              # DDI browser/runner
+├── runner.js               # Core DDI engine
+├── README.md               # This file
 └── examples/
-    ├── clustering.md   # K-Means & DBSCAN
-    └── ... (more)
+    ├── clustering.md       # K-Means & DBSCAN clustering
+    ├── neural-network.md   # Backpropagation training
+    ├── gan-training.md     # Generative Adversarial Networks
+    ├── particle-swarm.md   # Swarm optimization
+    ├── fractals.md         # L-system fractal trees
+    ├── voxel-world.md      # Procedural voxel generation
+    └── api.md              # REST API system setup
 ```
 
 ## 🔧 API Reference
