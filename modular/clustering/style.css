@@ -1,0 +1,56 @@
+* {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #000a14;
+}
+
+#c {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hud {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  color: #00ffff;
+  font: 12px monospace;
+  background: rgba(0, 0, 0, 0.9);
+  padding: 10px;
+  border: 1px solid #00ffff;
+  border-radius: 4px;
+}
+
+.buttons {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  gap: 5px;
+}
+
+button {
+  background: rgba(0, 255, 255, 0.2);
+  border: 1px solid #00ffff;
+  color: #00ffff;
+  padding: 8px 12px;
+  cursor: pointer;
+  font: 11px monospace;
+  border-radius: 4px;
+}
+
+button:hover {
+  background: rgba(0, 255, 255, 0.4);
+}
+
+span {
+  color: #0ff;
+  font-weight: bold;
+}

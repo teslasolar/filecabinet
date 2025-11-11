@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>🎨 Clustering</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="hud">
+🎨 CLUSTERING<br>
+Points: <span id="pts">0</span><br>
+Clusters: <span id="cls">0</span><br>
+Iter: <span id="iter">0</span><br>
+Method: <span id="mth">K-Means</span>
+</div>
+<div class="buttons">
+<button onclick="app.kmeans()">🎯 K-Means</button>
+<button onclick="app.dbscan()">🔍 DBSCAN</button>
+<button onclick="app.addPoints()">➕ Points</button>
+<button onclick="app.reset()">🔄 Reset</button>
+</div>
+<script type="module" src="core.js"></script>
+</body>
+</html>
