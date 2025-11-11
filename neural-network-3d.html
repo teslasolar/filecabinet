@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 Neural Network File System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0f0;
+            overflow: hidden;
+        }
+        #container { width: 100vw; height: 100vh; }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #0f0;
+            padding: 15px;
+            z-index: 100;
+            max-width: 300px;
+        }
+        .stat { display: flex; justify-content: space-between; padding: 5px 0; }
+        .stat-label { color: #888; }
+        .stat-value { color: #0f0; font-weight: bold; }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid #0f0;
+            color: #0f0;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background: rgba(0, 255, 0, 0.4);
+            box-shadow: 0 0 15px #0f0;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #ff0;
+            padding: 15px;
+            max-width: 250px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <div id="hud">
+        <div style="color: #0f0; font-weight: bold; margin-bottom: 10px; font-size: 16px;">
+            🧠 NEURAL NETWORK
+        </div>
+        <div class="stat">
+            <span class="stat-label">Nodes:</span>
+            <span class="stat-value" id="stat-nodes">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Connections:</span>
+            <span class="stat-value" id="stat-connections">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Activity:</span>
+            <span class="stat-value" id="stat-activity">0%</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Signal Strength:</span>
+            <span class="stat-value" id="stat-signal">100%</span>
+        </div>
+    </div>
+
+    <div id="info">
+        <div style="color: #ff0; font-size: 12px; margin-bottom: 5px;">FILES AS NEURONS</div>
+        <div style="font-size: 10px; color: #888; line-height: 1.6;">
+            Each file is a neuron in the network. Connections represent dependencies and relationships. Watch signals pulse through the network in real-time.
+        </div>
+    </div>
+
+    <div id="controls">
+        <button class="btn" onclick="Network.addNode()">➕ Add Neuron</button>
+        <button class="btn" onclick="Network.pulse()">⚡ Send Pulse</button>
+        <button class="btn" onclick="Network.toggleMode()">🔄 Toggle Mode</button>
+        <button class="btn" onclick="Network.reset()">🔄 Reset</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const Network = {
+            scene: null,
+            camera: null,
+            renderer: null,
+            nodes: [],
+            connections: [],
+            pulses: [],
+            mode: 'spring', // spring, circular, sphere
+
+            init() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x000000);
+                this.scene.fog = new THREE.Fog(0x000000, 300, 1000);
+
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2000);
+                this.camera.position.set(0, 0, 500);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                document.getElementById('container').appendChild(this.renderer.domElement);
+
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0x404040);
+                this.scene.add(ambientLight);
+
+                const pointLight = new THREE.PointLight(0x00ff00, 1, 500);
+                pointLight.position.set(0, 0, 0);
+                this.scene.add(pointLight);
+
+                // Create initial network
+                this.createInitialNetwork();
+
+                // Mouse controls
+                this.setupControls();
+
+                // Animation loop
+                this.animate();
+            },
+
+            createInitialNetwork() {
+                const fileNames = ['index.ts', 'app.ts', 'utils.ts', 'config.json', 'styles.css',
+                                   'api.ts', 'database.ts', 'auth.ts', 'components.tsx', 'routes.ts',
+                                   'models.ts', 'services.ts', 'middleware.ts', 'constants.ts'];
+
+                fileNames.forEach(name => this.createNode(name));
+                this.createConnections();
+            },
+
+            createNode(name) {
+                const geometry = new THREE.SphereGeometry(8, 16, 16);
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x00ff00,
+                    emissive: 0x00ff00,
+                    emissiveIntensity: 0.5,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const node = new THREE.Mesh(geometry, material);
+
+                node.userData = {
+                    name: name || `node_${this.nodes.length}`,
+                    connections: [],
+                    activity: 0,
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 0.5,
+                        (Math.random() - 0.5) * 0.5,
+                        (Math.random() - 0.5) * 0.5
+                    ),
+                    force: new THREE.Vector3(0, 0, 0)
+                };
+
+                this.positionNode(node);
+                this.scene.add(node);
+                this.nodes.push(node);
+
+                // Add glow
+                const glowGeometry = new THREE.SphereGeometry(12, 16, 16);
+                const glowMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x00ff00,
+                    transparent: true,
+                    opacity: 0.2
+                });
+                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                node.add(glow);
+
+                return node;
+            },
+
+            positionNode(node) {
+                const index = this.nodes.length;
+
+                if (this.mode === 'circular') {
+                    const angle = (index / 20) * Math.PI * 2;
+                    const radius = 200;
+                    node.position.x = Math.cos(angle) * radius;
+                    node.position.y = Math.sin(angle) * radius;
+                    node.position.z = (index % 3 - 1) * 100;
+                } else if (this.mode === 'sphere') {
+                    const phi = Math.acos(-1 + (2 * index) / 20);
+                    const theta = Math.sqrt(20 * Math.PI) * phi;
+                    const radius = 200;
+                    node.position.x = radius * Math.cos(theta) * Math.sin(phi);
+                    node.position.y = radius * Math.sin(theta) * Math.sin(phi);
+                    node.position.z = radius * Math.cos(phi);
+                } else {
+                    // Random spring layout
+                    node.position.x = (Math.random() - 0.5) * 400;
+                    node.position.y = (Math.random() - 0.5) * 400;
+                    node.position.z = (Math.random() - 0.5) * 400;
+                }
+            },
+
+            createConnections() {
+                // Clear existing connections
+                this.connections.forEach(conn => this.scene.remove(conn));
+                this.connections = [];
+
+                // Create connections between nearby nodes
+                this.nodes.forEach((node, i) => {
+                    const numConnections = Math.floor(Math.random() * 3) + 1;
+                    for (let j = 0; j < numConnections; j++) {
+                        const targetIndex = Math.floor(Math.random() * this.nodes.length);
+                        if (targetIndex !== i) {
+                            this.createConnection(node, this.nodes[targetIndex]);
+                        }
+                    }
+                });
+            },
+
+            createConnection(nodeA, nodeB) {
+                const material = new THREE.LineBasicMaterial({
+                    color: 0x00ff00,
+                    transparent: true,
+                    opacity: 0.2
+                });
+
+                const geometry = new THREE.BufferGeometry().setFromPoints([
+                    nodeA.position.clone(),
+                    nodeB.position.clone()
+                ]);
+
+                const line = new THREE.Line(geometry, material);
+                line.userData = { nodeA, nodeB };
+                this.scene.add(line);
+                this.connections.push(line);
+
+                // Track connection in nodes
+                nodeA.userData.connections.push(nodeB);
+            },
+
+            updateConnections() {
+                this.connections.forEach(conn => {
+                    const points = [
+                        conn.userData.nodeA.position.clone(),
+                        conn.userData.nodeB.position.clone()
+                    ];
+                    conn.geometry.setFromPoints(points);
+                });
+            },
+
+            applyForces() {
+                if (this.mode !== 'spring') return;
+
+                // Reset forces
+                this.nodes.forEach(node => {
+                    node.userData.force.set(0, 0, 0);
+                });
+
+                // Repulsion between all nodes
+                for (let i = 0; i < this.nodes.length; i++) {
+                    for (let j = i + 1; j < this.nodes.length; j++) {
+                        const nodeA = this.nodes[i];
+                        const nodeB = this.nodes[j];
+
+                        const delta = new THREE.Vector3().subVectors(
+                            nodeA.position,
+                            nodeB.position
+                        );
+                        const distance = delta.length();
+
+                        if (distance < 0.1) continue;
+
+                        const force = 1000 / (distance * distance);
+                        delta.normalize().multiplyScalar(force);
+
+                        nodeA.userData.force.add(delta);
+                        nodeB.userData.force.sub(delta);
+                    }
+                }
+
+                // Attraction along connections
+                this.connections.forEach(conn => {
+                    const nodeA = conn.userData.nodeA;
+                    const nodeB = conn.userData.nodeB;
+
+                    const delta = new THREE.Vector3().subVectors(
+                        nodeB.position,
+                        nodeA.position
+                    );
+                    const distance = delta.length();
+                    const idealDistance = 100;
+
+                    const force = (distance - idealDistance) * 0.01;
+                    delta.normalize().multiplyScalar(force);
+
+                    nodeA.userData.force.add(delta);
+                    nodeB.userData.force.sub(delta);
+                });
+
+                // Apply forces and update positions
+                this.nodes.forEach(node => {
+                    node.userData.velocity.add(node.userData.force.multiplyScalar(0.1));
+                    node.userData.velocity.multiplyScalar(0.95); // Damping
+                    node.position.add(node.userData.velocity);
+
+                    // Keep in bounds
+                    const maxDist = 300;
+                    if (node.position.length() > maxDist) {
+                        node.position.normalize().multiplyScalar(maxDist);
+                    }
+                });
+            },
+
+            pulse() {
+                // Send pulse from random node
+                const startNode = this.nodes[Math.floor(Math.random() * this.nodes.length)];
+
+                const pulse = {
+                    currentNode: startNode,
+                    visited: new Set([startNode]),
+                    color: new THREE.Color(1, 1, 0),
+                    strength: 1
+                };
+
+                this.pulses.push(pulse);
+                startNode.material.emissiveIntensity = 1.5;
+            },
+
+            updatePulses() {
+                this.pulses = this.pulses.filter(pulse => {
+                    pulse.strength *= 0.95;
+
+                    if (pulse.strength < 0.1) return false;
+
+                    // Jump to connected node
+                    if (Math.random() < 0.1) {
+                        const connections = pulse.currentNode.userData.connections;
+                        if (connections.length > 0) {
+                            const nextNode = connections[Math.floor(Math.random() * connections.length)];
+                            if (!pulse.visited.has(nextNode)) {
+                                pulse.visited.add(nextNode);
+                                pulse.currentNode = nextNode;
+                                nextNode.material.emissiveIntensity = 1.5;
+                            }
+                        }
+                    }
+
+                    return true;
+                });
+
+                // Decay emissive intensity
+                this.nodes.forEach(node => {
+                    node.material.emissiveIntensity *= 0.98;
+                    node.material.emissiveIntensity = Math.max(0.5, node.material.emissiveIntensity);
+                });
+            },
+
+            addNode() {
+                const node = this.createNode();
+
+                // Connect to random existing nodes
+                for (let i = 0; i < 2; i++) {
+                    const target = this.nodes[Math.floor(Math.random() * (this.nodes.length - 1))];
+                    this.createConnection(node, target);
+                }
+            },
+
+            toggleMode() {
+                const modes = ['spring', 'circular', 'sphere'];
+                const currentIndex = modes.indexOf(this.mode);
+                this.mode = modes[(currentIndex + 1) % modes.length];
+
+                // Reposition nodes
+                this.nodes.forEach((node, i) => {
+                    this.positionNode(node);
+                });
+            },
+
+            reset() {
+                this.nodes.forEach(node => this.scene.remove(node));
+                this.connections.forEach(conn => this.scene.remove(conn));
+                this.nodes = [];
+                this.connections = [];
+                this.pulses = [];
+                this.createInitialNetwork();
+            },
+
+            updateStats() {
+                document.getElementById('stat-nodes').textContent = this.nodes.length;
+                document.getElementById('stat-connections').textContent = this.connections.length;
+                document.getElementById('stat-activity').textContent =
+                    (this.pulses.length * 10).toFixed(0) + '%';
+                document.getElementById('stat-signal').textContent =
+                    (100 - this.pulses.length * 5).toFixed(0) + '%';
+            },
+
+            setupControls() {
+                let isDragging = false;
+                let previousMouse = { x: 0, y: 0 };
+
+                this.renderer.domElement.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                });
+
+                this.renderer.domElement.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const deltaX = e.clientX - previousMouse.x;
+                        const deltaY = e.clientY - previousMouse.y;
+
+                        this.camera.position.x -= deltaX * 0.5;
+                        this.camera.position.y += deltaY * 0.5;
+                    }
+                    previousMouse = { x: e.clientX, y: e.clientY };
+                });
+
+                this.renderer.domElement.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+
+                this.renderer.domElement.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    this.camera.position.z += e.deltaY * 0.5;
+                    this.camera.position.z = Math.max(200, Math.min(1000, this.camera.position.z));
+                });
+
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            },
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                this.applyForces();
+                this.updateConnections();
+                this.updatePulses();
+
+                // Rotate camera slowly
+                if (this.mode !== 'spring') {
+                    const time = Date.now() * 0.0001;
+                    this.camera.position.x = Math.sin(time) * 500;
+                    this.camera.position.z = Math.cos(time) * 500;
+                    this.camera.lookAt(0, 0, 0);
+                }
+
+                // Auto-pulse
+                if (Math.random() < 0.02) {
+                    this.pulse();
+                }
+
+                this.updateStats();
+                this.renderer.render(this.scene, this.camera);
+            }
+        };
+
+        window.addEventListener('load', () => Network.init());
+    </script>
+</body>
+</html>

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Particle Swarm File Activity</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+        #container { width: 100vw; height: 100vh; }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid #ff0000;
+            padding: 15px;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+        .stat { display: flex; justify-content: space-between; padding: 5px 0; }
+        .stat-label { color: #aaa; }
+        .stat-value { color: #ff0000; font-weight: bold; }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            max-width: 400px;
+        }
+        .btn {
+            background: rgba(255, 0, 0, 0.3);
+            border: 1px solid #ff0000;
+            color: #fff;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+            font-size: 11px;
+        }
+        .btn:hover {
+            background: rgba(255, 0, 0, 0.6);
+            box-shadow: 0 0 20px #ff0000;
+        }
+        #heat-legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #00ffff;
+            padding: 15px;
+            max-width: 200px;
+        }
+        .heat-bar {
+            width: 100%;
+            height: 20px;
+            background: linear-gradient(to right, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000);
+            margin: 10px 0;
+            border: 1px solid #fff;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <div id="hud">
+        <div style="color: #ff0000; font-weight: bold; margin-bottom: 10px; font-size: 16px;">
+            ⚡ PARTICLE SWARM
+        </div>
+        <div class="stat">
+            <span class="stat-label">Particles:</span>
+            <span class="stat-value" id="stat-particles">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Hotspots:</span>
+            <span class="stat-value" id="stat-hotspots">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Avg Activity:</span>
+            <span class="stat-value" id="stat-activity">0%</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Energy:</span>
+            <span class="stat-value" id="stat-energy">0</span>
+        </div>
+    </div>
+
+    <div id="heat-legend">
+        <div style="color: #00ffff; font-size: 12px; margin-bottom: 5px; font-weight: bold;">ACTIVITY HEAT MAP</div>
+        <div style="font-size: 10px; color: #aaa; margin-bottom: 10px;">
+            Files glow based on access frequency and modification time
+        </div>
+        <div class="heat-bar"></div>
+        <div style="display: flex; justify-content: space-between; font-size: 9px; color: #aaa;">
+            <span>Cold</span>
+            <span>HOT</span>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button class="btn" onclick="Swarm.addParticles(100)">➕ Add 100 Particles</button>
+        <button class="btn" onclick="Swarm.createHotspot()">🔥 Create Hotspot</button>
+        <button class="btn" onclick="Swarm.explode()">💥 Explode</button>
+        <button class="btn" onclick="Swarm.toggleMode()">🔄 Toggle Mode</button>
+        <button class="btn" onclick="Swarm.reset()">🔄 Reset</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const Swarm = {
+            scene: null,
+            camera: null,
+            renderer: null,
+            particles: [],
+            hotspots: [],
+            particleSystem: null,
+            mode: 'swarm', // swarm, flow, vortex, chaos
+
+            init() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x000000);
+                this.scene.fog = new THREE.Fog(0x000000, 200, 1000);
+
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2000);
+                this.camera.position.set(0, 200, 600);
+                this.camera.lookAt(0, 0, 0);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                document.getElementById('container').appendChild(this.renderer.domElement);
+
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0x333333);
+                this.scene.add(ambientLight);
+
+                // Create particle system
+                this.createParticleSystem();
+
+                // Create initial hotspots (files)
+                this.createHotspot('index.ts', -200, 0, 0, 5);
+                this.createHotspot('app.ts', 200, 0, 0, 4);
+                this.createHotspot('utils.ts', 0, 100, -200, 3);
+                this.createHotspot('config.json', 0, -100, 200, 2);
+
+                // Add initial particles
+                this.addParticles(500);
+
+                this.setupControls();
+                this.animate();
+            },
+
+            createParticleSystem() {
+                // Grid reference
+                const gridHelper = new THREE.GridHelper(800, 40, 0x333333, 0x111111);
+                gridHelper.position.y = -200;
+                this.scene.add(gridHelper);
+            },
+
+            addParticles(count) {
+                for (let i = 0; i < count; i++) {
+                    const particle = this.createParticle();
+                    this.particles.push(particle);
+                    this.scene.add(particle.mesh);
+                }
+            },
+
+            createParticle() {
+                const geometry = new THREE.SphereGeometry(1, 4, 4);
+                const color = new THREE.Color().setHSL(Math.random(), 1, 0.5);
+                const material = new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+
+                mesh.position.set(
+                    (Math.random() - 0.5) * 400,
+                    (Math.random() - 0.5) * 400,
+                    (Math.random() - 0.5) * 400
+                );
+
+                const particle = {
+                    mesh: mesh,
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 2,
+                        (Math.random() - 0.5) * 2,
+                        (Math.random() - 0.5) * 2
+                    ),
+                    acceleration: new THREE.Vector3(0, 0, 0),
+                    maxSpeed: 3,
+                    activity: Math.random(),
+                    life: 1.0
+                };
+
+                return particle;
+            },
+
+            createHotspot(name, x, y, z, strength) {
+                // Core
+                const coreGeometry = new THREE.SphereGeometry(10, 16, 16);
+                const coreMaterial = new THREE.MeshPhongMaterial({
+                    color: this.getHeatColor(strength / 5),
+                    emissive: this.getHeatColor(strength / 5),
+                    emissiveIntensity: 0.8,
+                    transparent: true,
+                    opacity: 0.7
+                });
+                const core = new THREE.Mesh(coreGeometry, coreMaterial);
+                core.position.set(x, y, z);
+                this.scene.add(core);
+
+                // Glow
+                const glowGeometry = new THREE.SphereGeometry(20, 16, 16);
+                const glowMaterial = new THREE.MeshBasicMaterial({
+                    color: this.getHeatColor(strength / 5),
+                    transparent: true,
+                    opacity: 0.2
+                });
+                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                core.add(glow);
+
+                // Light
+                const light = new THREE.PointLight(this.getHeatColor(strength / 5), strength, 200);
+                light.position.set(x, y, z);
+                this.scene.add(light);
+
+                const hotspot = {
+                    name: name,
+                    core: core,
+                    light: light,
+                    position: new THREE.Vector3(x, y, z),
+                    strength: strength,
+                    range: 100 + strength * 20,
+                    activity: 0
+                };
+
+                this.hotspots.push(hotspot);
+                return hotspot;
+            },
+
+            getHeatColor(value) {
+                // 0 = blue (cold), 1 = red (hot)
+                if (value < 0.25) {
+                    return new THREE.Color().setHSL(0.66, 1, 0.5); // Blue
+                } else if (value < 0.5) {
+                    return new THREE.Color().setHSL(0.5, 1, 0.5); // Cyan
+                } else if (value < 0.75) {
+                    return new THREE.Color().setHSL(0.33, 1, 0.5); // Green/Yellow
+                } else {
+                    return new THREE.Color().setHSL(0, 1, 0.5); // Red
+                }
+            },
+
+            updateParticles() {
+                this.particles.forEach(particle => {
+                    particle.acceleration.set(0, 0, 0);
+
+                    if (this.mode === 'swarm') {
+                        // Swarm behavior - attracted to hotspots
+                        this.hotspots.forEach(hotspot => {
+                            const distance = particle.mesh.position.distanceTo(hotspot.position);
+                            if (distance < hotspot.range) {
+                                const direction = new THREE.Vector3()
+                                    .subVectors(hotspot.position, particle.mesh.position)
+                                    .normalize();
+
+                                const force = (hotspot.strength / (distance + 1)) * 0.5;
+                                particle.acceleration.add(direction.multiplyScalar(force));
+
+                                // Heat particle based on proximity
+                                particle.activity = Math.min(1, particle.activity + 0.01);
+                            }
+                        });
+                    } else if (this.mode === 'flow') {
+                        // Flow field
+                        const x = particle.mesh.position.x * 0.01;
+                        const y = particle.mesh.position.y * 0.01;
+                        const z = particle.mesh.position.z * 0.01;
+
+                        particle.acceleration.x = Math.sin(y + Date.now() * 0.0001) * 0.1;
+                        particle.acceleration.y = Math.cos(x + Date.now() * 0.0001) * 0.1;
+                        particle.acceleration.z = Math.sin(z + Date.now() * 0.0001) * 0.1;
+                    } else if (this.mode === 'vortex') {
+                        // Vortex around center
+                        const toCenter = new THREE.Vector3().subVectors(
+                            new THREE.Vector3(0, 0, 0),
+                            particle.mesh.position
+                        );
+                        const distance = toCenter.length();
+
+                        const tangent = new THREE.Vector3(
+                            -toCenter.z,
+                            0,
+                            toCenter.x
+                        ).normalize();
+
+                        particle.acceleration.add(tangent.multiplyScalar(0.5));
+                        particle.acceleration.add(toCenter.normalize().multiplyScalar(0.1));
+                    } else if (this.mode === 'chaos') {
+                        // Chaotic brownian motion
+                        particle.acceleration.set(
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5,
+                            (Math.random() - 0.5) * 0.5
+                        );
+                    }
+
+                    // Apply acceleration
+                    particle.velocity.add(particle.acceleration);
+
+                    // Limit speed
+                    if (particle.velocity.length() > particle.maxSpeed) {
+                        particle.velocity.normalize().multiplyScalar(particle.maxSpeed);
+                    }
+
+                    // Update position
+                    particle.mesh.position.add(particle.velocity);
+
+                    // Wrap around boundaries
+                    ['x', 'y', 'z'].forEach(axis => {
+                        if (particle.mesh.position[axis] > 400) particle.mesh.position[axis] = -400;
+                        if (particle.mesh.position[axis] < -400) particle.mesh.position[axis] = 400;
+                    });
+
+                    // Update color based on activity
+                    const color = this.getHeatColor(particle.activity);
+                    particle.mesh.material.color.copy(color);
+
+                    // Decay activity
+                    particle.activity *= 0.995;
+                });
+            },
+
+            updateHotspots() {
+                this.hotspots.forEach(hotspot => {
+                    // Pulse effect
+                    const pulse = Math.sin(Date.now() * 0.002) * 0.3 + 1;
+                    hotspot.core.scale.set(pulse, pulse, pulse);
+
+                    // Count nearby particles
+                    let nearbyCount = 0;
+                    this.particles.forEach(particle => {
+                        const distance = particle.mesh.position.distanceTo(hotspot.position);
+                        if (distance < hotspot.range) {
+                            nearbyCount++;
+                        }
+                    });
+
+                    hotspot.activity = nearbyCount / this.particles.length;
+
+                    // Update light intensity
+                    hotspot.light.intensity = hotspot.strength * (0.5 + hotspot.activity * 2);
+                });
+            },
+
+            explode() {
+                // Send all particles flying outward
+                this.particles.forEach(particle => {
+                    const direction = new THREE.Vector3()
+                        .subVectors(particle.mesh.position, new THREE.Vector3(0, 0, 0))
+                        .normalize();
+
+                    particle.velocity.copy(direction.multiplyScalar(10 + Math.random() * 10));
+                    particle.activity = 1;
+                });
+            },
+
+            toggleMode() {
+                const modes = ['swarm', 'flow', 'vortex', 'chaos'];
+                const currentIndex = modes.indexOf(this.mode);
+                this.mode = modes[(currentIndex + 1) % modes.length];
+            },
+
+            reset() {
+                this.particles.forEach(particle => {
+                    this.scene.remove(particle.mesh);
+                });
+                this.particles = [];
+                this.addParticles(500);
+            },
+
+            updateStats() {
+                document.getElementById('stat-particles').textContent = this.particles.length;
+                document.getElementById('stat-hotspots').textContent = this.hotspots.length;
+
+                const avgActivity = this.particles.reduce((sum, p) => sum + p.activity, 0) / this.particles.length;
+                document.getElementById('stat-activity').textContent = (avgActivity * 100).toFixed(1) + '%';
+
+                const totalEnergy = this.particles.reduce((sum, p) => sum + p.velocity.length(), 0);
+                document.getElementById('stat-energy').textContent = totalEnergy.toFixed(0);
+            },
+
+            setupControls() {
+                let isDragging = false;
+                let previousMouse = { x: 0, y: 0 };
+
+                this.renderer.domElement.addEventListener('mousedown', () => {
+                    isDragging = true;
+                });
+
+                this.renderer.domElement.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const deltaX = e.clientX - previousMouse.x;
+                        const deltaY = e.clientY - previousMouse.y;
+
+                        this.camera.position.x -= deltaX * 0.5;
+                        this.camera.position.y += deltaY * 0.5;
+                        this.camera.lookAt(0, 0, 0);
+                    }
+                    previousMouse = { x: e.clientX, y: e.clientY };
+                });
+
+                this.renderer.domElement.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+
+                this.renderer.domElement.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    this.camera.position.z += e.deltaY * 0.5;
+                    this.camera.position.z = Math.max(200, Math.min(1500, this.camera.position.z));
+                });
+
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            },
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                this.updateParticles();
+                this.updateHotspots();
+                this.updateStats();
+
+                // Rotate camera slowly
+                const time = Date.now() * 0.0001;
+                this.camera.position.x = Math.sin(time) * 600;
+                this.camera.position.z = Math.cos(time) * 600;
+                this.camera.lookAt(0, 0, 0);
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        };
+
+        window.addEventListener('load', () => Swarm.init());
+    </script>
+</body>
+</html>

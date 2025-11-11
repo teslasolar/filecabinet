@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌌 Galaxy File Explorer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+        }
+        #container { width: 100vw; height: 100vh; }
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(138, 43, 226, 0.2);
+            border: 1px solid #8a2be2;
+            padding: 15px;
+            z-index: 100;
+            backdrop-filter: blur(5px);
+        }
+        .stat { display: flex; justify-content: space-between; padding: 5px 0; }
+        .stat-label { color: #aaa; }
+        .stat-value { color: #8a2be2; font-weight: bold; }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            background: rgba(138, 43, 226, 0.3);
+            border: 1px solid #8a2be2;
+            color: #fff;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+        }
+        .btn:hover {
+            background: rgba(138, 43, 226, 0.6);
+            box-shadow: 0 0 20px #8a2be2;
+        }
+        #legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #ff1493;
+            padding: 15px;
+            max-width: 200px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 0;
+            font-size: 11px;
+        }
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+
+    <div id="hud">
+        <div style="color: #8a2be2; font-weight: bold; margin-bottom: 10px; font-size: 16px;">
+            🌌 GALAXY EXPLORER
+        </div>
+        <div class="stat">
+            <span class="stat-label">Solar Systems:</span>
+            <span class="stat-value" id="stat-systems">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Planets (Files):</span>
+            <span class="stat-value" id="stat-planets">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Moons (Dependencies):</span>
+            <span class="stat-value" id="stat-moons">0</span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Asteroids (Temp):</span>
+            <span class="stat-value" id="stat-asteroids">0</span>
+        </div>
+    </div>
+
+    <div id="legend">
+        <div style="color: #ff1493; font-size: 12px; margin-bottom: 10px; font-weight: bold;">FILE TYPES</div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ff6b6b;"></div>
+            <span>.ts/.js - Code</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #4ecdc4;"></div>
+            <span>.json - Config</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #45b7d1;"></div>
+            <span>.css/.scss - Style</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #96ceb4;"></div>
+            <span>.html - Markup</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ffeaa7;"></div>
+            <span>.md - Docs</span>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button class="btn" onclick="Galaxy.addSystem()">➕ Add System</button>
+        <button class="btn" onclick="Galaxy.addPlanet()">🪐 Add Planet</button>
+        <button class="btn" onclick="Galaxy.speedUp()">⏩ Speed Up</button>
+        <button class="btn" onclick="Galaxy.slowDown()">⏪ Slow Down</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const Galaxy = {
+            scene: null,
+            camera: null,
+            renderer: null,
+            solarSystems: [],
+            timeScale: 1,
+
+            fileColors: {
+                'ts': 0xff6b6b, 'js': 0xff6b6b,
+                'json': 0x4ecdc4, 'yaml': 0x4ecdc4,
+                'css': 0x45b7d1, 'scss': 0x45b7d1,
+                'html': 0x96ceb4, 'tsx': 0x96ceb4,
+                'md': 0xffeaa7, 'txt': 0xffeaa7
+            },
+
+            init() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x000510);
+                this.scene.fog = new THREE.FogExp2(0x000510, 0.0005);
+
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 5000);
+                this.camera.position.set(0, 800, 1200);
+                this.camera.lookAt(0, 0, 0);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                document.getElementById('container').appendChild(this.renderer.domElement);
+
+                // Add stars background
+                this.createStarfield();
+
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0x333333);
+                this.scene.add(ambientLight);
+
+                // Create initial solar systems
+                this.createSolarSystem('Core System', 0, 0, 0, 0xff00ff);
+                this.createSolarSystem('Dev System', 600, 0, 0, 0x00ffff);
+                this.createSolarSystem('Build System', -600, 0, 400, 0xff6b6b);
+
+                this.setupControls();
+                this.animate();
+            },
+
+            createStarfield() {
+                const geometry = new THREE.BufferGeometry();
+                const vertices = [];
+
+                for (let i = 0; i < 10000; i++) {
+                    const x = (Math.random() - 0.5) * 4000;
+                    const y = (Math.random() - 0.5) * 4000;
+                    const z = (Math.random() - 0.5) * 4000;
+                    vertices.push(x, y, z);
+                }
+
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+
+                const material = new THREE.PointsMaterial({
+                    color: 0xffffff,
+                    size: 2,
+                    transparent: true,
+                    opacity: 0.8
+                });
+
+                const stars = new THREE.Points(geometry, material);
+                this.scene.add(stars);
+            },
+
+            createSolarSystem(name, x, y, z, color) {
+                const system = {
+                    name: name,
+                    position: new THREE.Vector3(x, y, z),
+                    sun: null,
+                    planets: [],
+                    asteroids: []
+                };
+
+                // Create sun (folder/module)
+                const sunGeometry = new THREE.SphereGeometry(30, 32, 32);
+                const sunMaterial = new THREE.MeshPhongMaterial({
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: 0.8
+                });
+                const sun = new THREE.Mesh(sunGeometry, sunMaterial);
+                sun.position.set(x, y, z);
+                this.scene.add(sun);
+                system.sun = sun;
+
+                // Add sun glow
+                const glowGeometry = new THREE.SphereGeometry(40, 32, 32);
+                const glowMaterial = new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 0.3
+                });
+                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                sun.add(glow);
+
+                // Add point light
+                const light = new THREE.PointLight(color, 1, 500);
+                light.position.set(x, y, z);
+                this.scene.add(light);
+                system.light = light;
+
+                // Create planets (files)
+                const fileTypes = ['index.ts', 'app.ts', 'config.json', 'styles.css', 'README.md'];
+                fileTypes.forEach((file, i) => {
+                    this.createPlanet(system, file, i + 1);
+                });
+
+                // Create asteroid belt
+                this.createAsteroidBelt(system);
+
+                this.solarSystems.push(system);
+                return system;
+            },
+
+            createPlanet(system, fileName, orbitIndex) {
+                const ext = fileName.split('.').pop();
+                const color = this.fileColors[ext] || 0xffffff;
+
+                const size = 5 + Math.random() * 10;
+                const geometry = new THREE.SphereGeometry(size, 16, 16);
+                const material = new THREE.MeshPhongMaterial({
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: 0.2
+                });
+                const planet = new THREE.Mesh(geometry, material);
+
+                const orbitRadius = 80 + orbitIndex * 60;
+                const orbitSpeed = 0.001 / orbitIndex;
+                const orbitAngle = Math.random() * Math.PI * 2;
+
+                planet.userData = {
+                    name: fileName,
+                    orbitRadius: orbitRadius,
+                    orbitSpeed: orbitSpeed,
+                    orbitAngle: orbitAngle,
+                    system: system,
+                    size: size,
+                    moons: []
+                };
+
+                this.scene.add(planet);
+                system.planets.push(planet);
+
+                // Draw orbit line
+                const orbitCurve = new THREE.EllipseCurve(
+                    system.position.x, system.position.z,
+                    orbitRadius, orbitRadius,
+                    0, 2 * Math.PI,
+                    false, 0
+                );
+
+                const points = orbitCurve.getPoints(64);
+                const orbitGeometry = new THREE.BufferGeometry().setFromPoints(
+                    points.map(p => new THREE.Vector3(p.x, system.position.y, p.y))
+                );
+                const orbitMaterial = new THREE.LineBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 0.2
+                });
+                const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial);
+                this.scene.add(orbitLine);
+
+                // Sometimes add a moon (dependency)
+                if (Math.random() > 0.6) {
+                    this.createMoon(planet);
+                }
+
+                return planet;
+            },
+
+            createMoon(planet) {
+                const geometry = new THREE.SphereGeometry(2, 8, 8);
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0xcccccc,
+                    emissive: 0x666666,
+                    emissiveIntensity: 0.2
+                });
+                const moon = new THREE.Mesh(geometry, material);
+
+                moon.userData = {
+                    orbitRadius: planet.userData.size * 2,
+                    orbitSpeed: 0.02,
+                    orbitAngle: Math.random() * Math.PI * 2,
+                    planet: planet
+                };
+
+                this.scene.add(moon);
+                planet.userData.moons.push(moon);
+                return moon;
+            },
+
+            createAsteroidBelt(system) {
+                for (let i = 0; i < 50; i++) {
+                    const geometry = new THREE.TetrahedronGeometry(1 + Math.random() * 2);
+                    const material = new THREE.MeshPhongMaterial({
+                        color: 0x888888,
+                        flatShading: true
+                    });
+                    const asteroid = new THREE.Mesh(geometry, material);
+
+                    const radius = 250 + Math.random() * 50;
+                    const angle = Math.random() * Math.PI * 2;
+                    const height = (Math.random() - 0.5) * 20;
+
+                    asteroid.userData = {
+                        orbitRadius: radius,
+                        orbitSpeed: 0.0005 + Math.random() * 0.001,
+                        orbitAngle: angle,
+                        system: system,
+                        rotationSpeed: new THREE.Vector3(
+                            Math.random() * 0.02,
+                            Math.random() * 0.02,
+                            Math.random() * 0.02
+                        )
+                    };
+
+                    this.scene.add(asteroid);
+                    system.asteroids.push(asteroid);
+                }
+            },
+
+            updateOrbits() {
+                this.solarSystems.forEach(system => {
+                    // Update planets
+                    system.planets.forEach(planet => {
+                        planet.userData.orbitAngle += planet.userData.orbitSpeed * this.timeScale;
+
+                        const x = system.position.x + Math.cos(planet.userData.orbitAngle) * planet.userData.orbitRadius;
+                        const z = system.position.z + Math.sin(planet.userData.orbitAngle) * planet.userData.orbitRadius;
+
+                        planet.position.set(x, system.position.y, z);
+                        planet.rotation.y += 0.01;
+
+                        // Update moons
+                        planet.userData.moons.forEach(moon => {
+                            moon.userData.orbitAngle += moon.userData.orbitSpeed * this.timeScale;
+
+                            const mx = planet.position.x + Math.cos(moon.userData.orbitAngle) * moon.userData.orbitRadius;
+                            const mz = planet.position.z + Math.sin(moon.userData.orbitAngle) * moon.userData.orbitRadius;
+
+                            moon.position.set(mx, planet.position.y, mz);
+                        });
+                    });
+
+                    // Update asteroids
+                    system.asteroids.forEach(asteroid => {
+                        asteroid.userData.orbitAngle += asteroid.userData.orbitSpeed * this.timeScale;
+
+                        const x = system.position.x + Math.cos(asteroid.userData.orbitAngle) * asteroid.userData.orbitRadius;
+                        const z = system.position.z + Math.sin(asteroid.userData.orbitAngle) * asteroid.userData.orbitRadius;
+
+                        asteroid.position.set(x, system.position.y, z);
+                        asteroid.rotation.x += asteroid.userData.rotationSpeed.x;
+                        asteroid.rotation.y += asteroid.userData.rotationSpeed.y;
+                        asteroid.rotation.z += asteroid.userData.rotationSpeed.z;
+                    });
+
+                    // Pulse sun
+                    const pulse = Math.sin(Date.now() * 0.001) * 0.2 + 0.8;
+                    system.sun.material.emissiveIntensity = pulse;
+                });
+            },
+
+            addSystem() {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 800 + Math.random() * 400;
+                const x = Math.cos(angle) * distance;
+                const z = Math.sin(angle) * distance;
+                const color = Math.random() * 0xffffff;
+
+                this.createSolarSystem(`System-${this.solarSystems.length + 1}`, x, 0, z, color);
+            },
+
+            addPlanet() {
+                const system = this.solarSystems[Math.floor(Math.random() * this.solarSystems.length)];
+                const fileExts = Object.keys(this.fileColors);
+                const ext = fileExts[Math.floor(Math.random() * fileExts.length)];
+                const fileName = `file_${system.planets.length}.${ext}`;
+
+                this.createPlanet(system, fileName, system.planets.length + 1);
+            },
+
+            speedUp() {
+                this.timeScale = Math.min(10, this.timeScale * 1.5);
+            },
+
+            slowDown() {
+                this.timeScale = Math.max(0.1, this.timeScale / 1.5);
+            },
+
+            updateStats() {
+                document.getElementById('stat-systems').textContent = this.solarSystems.length;
+
+                let totalPlanets = 0;
+                let totalMoons = 0;
+                let totalAsteroids = 0;
+
+                this.solarSystems.forEach(system => {
+                    totalPlanets += system.planets.length;
+                    totalAsteroids += system.asteroids.length;
+                    system.planets.forEach(planet => {
+                        totalMoons += planet.userData.moons.length;
+                    });
+                });
+
+                document.getElementById('stat-planets').textContent = totalPlanets;
+                document.getElementById('stat-moons').textContent = totalMoons;
+                document.getElementById('stat-asteroids').textContent = totalAsteroids;
+            },
+
+            setupControls() {
+                let isDragging = false;
+                let previousMouse = { x: 0, y: 0 };
+
+                this.renderer.domElement.addEventListener('mousedown', () => {
+                    isDragging = true;
+                });
+
+                this.renderer.domElement.addEventListener('mousemove', (e) => {
+                    if (isDragging) {
+                        const deltaX = e.clientX - previousMouse.x;
+                        const deltaY = e.clientY - previousMouse.y;
+
+                        const angle = this.camera.position.angleTo(new THREE.Vector3(0, 1, 0));
+                        const radius = Math.sqrt(
+                            this.camera.position.x ** 2 +
+                            this.camera.position.z ** 2
+                        );
+
+                        this.camera.position.x = Math.sin(angle + deltaX * 0.01) * radius;
+                        this.camera.position.z = Math.cos(angle + deltaX * 0.01) * radius;
+                        this.camera.position.y += deltaY;
+
+                        this.camera.lookAt(0, 0, 0);
+                    }
+                    previousMouse = { x: e.clientX, y: e.clientY };
+                });
+
+                this.renderer.domElement.addEventListener('mouseup', () => {
+                    isDragging = false;
+                });
+
+                this.renderer.domElement.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const direction = new THREE.Vector3();
+                    this.camera.getWorldDirection(direction);
+
+                    const zoomSpeed = e.deltaY > 0 ? 50 : -50;
+                    this.camera.position.addScaledVector(direction, zoomSpeed);
+                });
+
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            },
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                this.updateOrbits();
+                this.updateStats();
+
+                // Slowly rotate camera
+                const time = Date.now() * 0.00005;
+                this.camera.position.x = Math.sin(time) * 1200;
+                this.camera.position.z = Math.cos(time) * 1200;
+                this.camera.lookAt(0, 0, 0);
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        };
+
+        window.addEventListener('load', () => Galaxy.init());
+    </script>
+</body>
+</html>
